@@ -1,0 +1,43 @@
+{
+  "id": "discharges",
+  "title": "Patient Discharge Records",
+  "description": "Tracks discharges of admitted patients, including summary, date, and responsible doctor.",
+  "route": "/discharges",
+  "icon": "LogOut",
+  "entity": "Discharge",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "Receptionist", "Doctor"],
+    "create": ["Doctor", "Admin"],
+    "edit": ["Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/discharges",
+    "get": "/api/discharges/:id",
+    "create": "/api/discharges",
+    "update": "/api/discharges/:id",
+    "delete": "/api/discharges/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "admissionId", "type": "relation", "relationEntity": "admissions", "relationField": "id", "required": true, "showInList": true },
+    { "name": "dischargeDate", "type": "date", "required": true, "showInList": true },
+    { "name": "doctorId", "type": "relation", "relationEntity": "doctors", "relationField": "fullName", "showInList": true },
+    { "name": "summary", "type": "textarea" },
+    { "name": "status", "type": "enum", "options": ["CLEARED", "PENDING_BILLING"], "widget": "badge", "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "admissions", "type": "ManyToOne", "foreignKey": "admissionId" },
+    { "entity": "doctors", "type": "ManyToOne", "foreignKey": "doctorId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Discharges close the patient’s hospital stay and trigger billing and feedback flows.",
+    "uiLogic": "Discharge list links to billing verification and summary report download."
+  }
+}

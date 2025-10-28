@@ -1,0 +1,61 @@
+{
+  "id": "receptionists",
+  "title": "Receptionist Registry",
+  "description": "Handles receptionist profiles responsible for front-desk operations such as patient registration, appointment scheduling, and billing coordination.",
+  "route": "/receptionists",
+  "icon": "UserRound",
+  "entity": "Receptionist",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "HR", "ReceptionManager"],
+    "create": ["Admin", "HR"],
+    "edit": ["Admin", "HR"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/receptionists",
+    "get": "/api/receptionists/:id",
+    "create": "/api/receptionists",
+    "update": "/api/receptionists/:id",
+    "delete": "/api/receptionists/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "employeeCode", "type": "string", "unique": true, "required": true, "showInList": true },
+    { "name": "fullName", "type": "string", "required": true, "showInList": true },
+    { "name": "deskLocation", "label": "Desk Location", "type": "string", "placeholder": "Front Desk 1", "showInList": true },
+    { "name": "email", "type": "email" },
+    { "name": "contactNumber", "type": "string", "showInList": true },
+    { "name": "shiftType", "type": "enum", "options": ["MORNING", "EVENING", "ROTATIONAL"], "widget": "select", "showInList": true },
+    { "name": "status", "type": "enum", "options": ["ACTIVE", "INACTIVE"], "widget": "badge", "default": "ACTIVE", "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "appointments", "type": "OneToMany", "foreignKey": "receptionistId" }
+  ],
+
+  "ui": {
+    "listView": {
+      "title": "Reception Staff",
+      "columns": ["employeeCode", "fullName", "deskLocation", "shiftType", "status"],
+      "filters": ["shiftType", "status"],
+      "actions": ["view", "edit", "delete"]
+    },
+    "formView": {
+      "title": "Add / Edit Receptionist",
+      "layout": [
+        ["employeeCode", "fullName"],
+        ["deskLocation", "contactNumber"],
+        ["shiftType", "status"]
+      ]
+    }
+  },
+
+  "reasoning": {
+    "businessLogic": "Receptionists are key for managing appointments and patient flow. They must be assigned to specific desks for organized operations.",
+    "uiLogic": "Compact form simplifies quick addition or editing of reception staff, while list view tracks active/inactive members."
+  }
+}

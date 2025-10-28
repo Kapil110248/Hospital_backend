@@ -1,0 +1,63 @@
+{
+  "id": "departments",
+  "title": "Departments Registry",
+  "description": "Manages hospital departments such as Cardiology, Neurology, Radiology, etc. Each department is linked to doctors, nurses, and rooms.",
+  "route": "/departments",
+  "icon": "Building",
+  "entity": "Department",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "HR", "Doctor"],
+    "create": ["Admin"],
+    "edit": ["Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/departments",
+    "get": "/api/departments/:id",
+    "create": "/api/departments",
+    "update": "/api/departments/:id",
+    "delete": "/api/departments/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "name", "label": "Department Name", "type": "string", "required": true, "unique": true, "showInList": true },
+    { "name": "code", "label": "Code", "type": "string", "placeholder": "DEPT-001", "required": true, "showInList": true },
+    { "name": "headId", "label": "Head of Department", "type": "relation", "relationEntity": "doctors", "relationField": "fullName", "showInList": true },
+    { "name": "description", "label": "Description", "type": "textarea" },
+    { "name": "status", "label": "Status", "type": "enum", "options": ["ACTIVE", "INACTIVE"], "widget": "badge", "default": "ACTIVE", "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "doctors", "type": "OneToMany", "foreignKey": "departmentId" },
+    { "entity": "nurses", "type": "OneToMany", "foreignKey": "departmentId" },
+    { "entity": "rooms", "type": "OneToMany", "foreignKey": "departmentId" }
+  ],
+
+  "ui": {
+    "listView": {
+      "title": "Department Directory",
+      "columns": ["name", "code", "headId", "status"],
+      "filters": ["status"],
+      "searchFields": ["name", "code"],
+      "actions": ["view", "edit", "delete"]
+    },
+    "formView": {
+      "title": "Add / Edit Department",
+      "layout": [
+        ["name", "code"],
+        ["headId"],
+        ["description", "status"]
+      ],
+      "actions": ["save", "cancel"]
+    }
+  },
+
+  "reasoning": {
+    "businessLogic": "Each department forms an organizational unit in the hospital. Mapping staff and rooms ensures clarity in operational workflows.",
+    "uiLogic": "Simple department forms and search filters help admins and HR manage hierarchy efficiently."
+  }
+}

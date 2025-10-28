@@ -1,0 +1,44 @@
+{
+  "id": "radiologyrequests",
+  "title": "Radiology Requests",
+  "description": "Captures imaging test requests from doctors and routes them to radiology departments for review.",
+  "route": "/radiologyrequests",
+  "icon": "Scan",
+  "entity": "RadiologyRequest",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Doctor", "Radiologist", "Admin"],
+    "create": ["Doctor"],
+    "edit": ["Doctor", "Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/radiologyrequests",
+    "get": "/api/radiologyrequests/:id",
+    "create": "/api/radiologyrequests",
+    "update": "/api/radiologyrequests/:id",
+    "delete": "/api/radiologyrequests/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "consultationId", "type": "relation", "relationEntity": "consultations", "relationField": "id", "required": true },
+    { "name": "patientId", "type": "relation", "relationEntity": "patients", "relationField": "fullName", "showInList": true },
+    { "name": "doctorId", "type": "relation", "relationEntity": "doctors", "relationField": "fullName", "showInList": true },
+    { "name": "imagingType", "type": "enum", "options": ["X-RAY", "CT SCAN", "MRI", "ULTRASOUND"], "widget": "select", "required": true, "showInList": true },
+    { "name": "priority", "type": "enum", "options": ["ROUTINE", "URGENT"], "widget": "badge", "default": "ROUTINE", "showInList": true },
+    { "name": "status", "type": "enum", "options": ["PENDING", "IN_PROGRESS", "COMPLETED"], "widget": "badge", "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "consultations", "type": "ManyToOne", "foreignKey": "consultationId" },
+    { "entity": "radiologyreports", "type": "OneToOne", "foreignKey": "radiologyRequestId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Radiology requests are part of diagnostic flow. Doctors raise them, radiologists fulfill and report results.",
+    "uiLogic": "Clear workflow with color-coded priority and status ensures timely patient imaging."
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "labtechnicians",
+  "title": "Lab Technician Registry",
+  "description": "Stores profiles of laboratory staff, their certifications, and assigned lab departments.",
+  "route": "/labtechnicians",
+  "icon": "FlaskRound",
+  "entity": "LabTechnician",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "LabManager"],
+    "create": ["Admin", "LabManager"],
+    "edit": ["Admin", "LabManager"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/labtechnicians",
+    "get": "/api/labtechnicians/:id",
+    "create": "/api/labtechnicians",
+    "update": "/api/labtechnicians/:id",
+    "delete": "/api/labtechnicians/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "employeeCode", "type": "string", "unique": true, "required": true },
+    { "name": "fullName", "type": "string", "required": true, "showInList": true },
+    { "name": "labDepartment", "type": "enum", "options": ["PATHOLOGY", "BIOCHEMISTRY", "MICROBIOLOGY", "HEMATOLOGY"], "widget": "select", "required": true, "showInList": true },
+    { "name": "qualification", "type": "string" },
+    { "name": "email", "type": "email" },
+    { "name": "status", "type": "enum", "options": ["ACTIVE", "INACTIVE"], "widget": "badge", "default": "ACTIVE", "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "labrequests", "type": "OneToMany", "foreignKey": "technicianId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Technicians are allocated to specific labs. Assigning them correctly ensures accountability in test results.",
+    "uiLogic": "Lab heads can quickly manage or reassign staff as required."
+  }
+}

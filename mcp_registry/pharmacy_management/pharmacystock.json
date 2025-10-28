@@ -1,0 +1,45 @@
+{
+  "id": "pharmacystock",
+  "title": "Pharmacy Stock",
+  "description": "Tracks batch-wise stock levels, expiry, and supplier linkage for each medicine.",
+  "route": "/pharmacystock",
+  "icon": "PackageCheck",
+  "entity": "PharmacyStock",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "Pharmacist"],
+    "create": ["Pharmacist"],
+    "edit": ["Pharmacist", "Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/pharmacystock",
+    "get": "/api/pharmacystock/:id",
+    "create": "/api/pharmacystock",
+    "update": "/api/pharmacystock/:id",
+    "delete": "/api/pharmacystock/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "medicineId", "type": "relation", "relationEntity": "medicines", "relationField": "name", "required": true, "showInList": true },
+    { "name": "batchNumber", "label": "Batch No.", "type": "string", "required": true, "showInList": true },
+    { "name": "quantity", "type": "number", "label": "Quantity", "required": true, "showInList": true },
+    { "name": "expiryDate", "type": "date", "required": true, "showInList": true },
+    { "name": "supplierId", "type": "relation", "relationEntity": "suppliers", "relationField": "name", "showInList": true },
+    { "name": "purchasePrice", "label": "Purchase Price", "type": "currency", "required": true, "showInList": true },
+    { "name": "status", "label": "Status", "type": "enum", "options": ["ACTIVE", "EXPIRED", "LOW_STOCK"], "widget": "badge", "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "medicines", "type": "ManyToOne", "foreignKey": "medicineId" },
+    { "entity": "suppliers", "type": "ManyToOne", "foreignKey": "supplierId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Batch-level tracking ensures accurate expiry and quantity management. Links with suppliers for reorders.",
+    "uiLogic": "Low-stock badges and expiry highlights help pharmacists act quickly."
+  }
+}

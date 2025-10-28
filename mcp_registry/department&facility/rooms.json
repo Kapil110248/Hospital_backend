@@ -1,0 +1,44 @@
+{
+  "id": "rooms",
+  "title": "Room Management",
+  "description": "Tracks hospital rooms with type, capacity, and availability status.",
+  "route": "/rooms",
+  "icon": "DoorOpen",
+  "entity": "Room",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "Receptionist", "Nurse"],
+    "create": ["Admin"],
+    "edit": ["Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/rooms",
+    "get": "/api/rooms/:id",
+    "create": "/api/rooms",
+    "update": "/api/rooms/:id",
+    "delete": "/api/rooms/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "roomNumber", "label": "Room Number", "type": "string", "required": true, "unique": true, "showInList": true },
+    { "name": "departmentId", "label": "Department", "type": "relation", "relationEntity": "departments", "relationField": "name", "showInList": true },
+    { "name": "roomType", "label": "Room Type", "type": "enum", "options": ["GENERAL", "ICU", "DELUXE", "PRIVATE"], "widget": "select", "showInList": true },
+    { "name": "capacity", "label": "Capacity", "type": "number", "showInList": true },
+    { "name": "availability", "label": "Availability", "type": "enum", "options": ["AVAILABLE", "OCCUPIED", "MAINTENANCE"], "widget": "badge", "showInList": true },
+    { "name": "chargesPerDay", "label": "Charges (per day)", "type": "currency", "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "departments", "type": "ManyToOne", "foreignKey": "departmentId" },
+    { "entity": "beds", "type": "OneToMany", "foreignKey": "roomId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Each room belongs to a department and defines charge rates and capacity, critical for admissions and billing modules.",
+    "uiLogic": "Room list view provides quick visual cues on availability and department distribution."
+  }
+}

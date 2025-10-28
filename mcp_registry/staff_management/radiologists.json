@@ -1,0 +1,43 @@
+{
+  "id": "radiologists",
+  "title": "Radiologist Registry",
+  "description": "Tracks radiologist staff, specialization, and assigned imaging labs.",
+  "route": "/radiologists",
+  "icon": "ScanLine",
+  "entity": "Radiologist",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "RadiologyManager"],
+    "create": ["Admin"],
+    "edit": ["Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/radiologists",
+    "get": "/api/radiologists/:id",
+    "create": "/api/radiologists",
+    "update": "/api/radiologists/:id",
+    "delete": "/api/radiologists/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "employeeCode", "type": "string", "required": true },
+    { "name": "fullName", "type": "string", "required": true, "showInList": true },
+    { "name": "specialization", "type": "enum", "options": ["X-RAY", "CT-SCAN", "MRI", "ULTRASOUND"], "widget": "select", "showInList": true },
+    { "name": "email", "type": "email" },
+    { "name": "contactNumber", "type": "string" },
+    { "name": "status", "type": "enum", "options": ["ACTIVE", "INACTIVE"], "widget": "badge", "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "radiologyreports", "type": "OneToMany", "foreignKey": "radiologistId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Each radiologist specializes in one or more imaging services. This helps route test requests to the correct expert.",
+    "uiLogic": "Allows the admin to easily track availability of radiologists by specialization."
+  }
+}

@@ -132,7 +132,7 @@ enum BloodType {
   AB_NEG
   O_POS
   O_NEG
-  UNKNOWN
+  UNKNOWN 
 }
 
 /// --------------------
@@ -150,26 +150,33 @@ model User {
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  createdById  Int?      // administrative user who created this
+  createdById  Int?
+  // administrative user who created this
   updatedById  Int?
 
   // Relations
-  createdBy    User?     @relation("UserCreatedBy", fields: [createdById], references: [id])
-  updatedBy    User?     @relation("UserUpdatedBy", fields: [updatedById], references: [id])
-  doctor       Doctor?
+  createdBy    User? @relation("UserCreatedBy", fields: [createdById], references: [id])
+  updatedBy    User? @relation("UserUpdatedBy", fields: [updatedById], references: [id])
+  doctor       Doctor? 
   patient      Patient?
   nurse        Nurse?
   pharmacist   Pharmacist?
   auditLogs    AuditLog[]
 
-  // FIX: Missing back-relations for User
+  // FIXES: Missing back-relations for User
   createdUsers User[]    @relation("UserCreatedBy")
   updatedUsers User[]    @relation("UserUpdatedBy")
-  medicalRecords MedicalRecord[]
-  commissionPayouts CommissionPayout[]
-  bloodRequests BloodRequest[]
-  // FIX 3: Added missing back-relation for CommissionSetup
-  commissionSetups CommissionSetup[] 
+  medicalRecords MedicalRecord[] 
+  commissionPayouts CommissionPayout[] 
+  bloodRequests BloodRequest[] 
+  commissionSetups CommissionSetup[]
+  vitalsRecorded Vitals[] @relation("UserRecordedVitals")
+  
+  // FIX: Relation field for FollowUp
+  followUps      FollowUp[] @relation("FollowUpDoctor")
+  
+  // FIX: New back-relation for StaffAttendance
+  staffAttendanceRecords StaffAttendance[] @relation("StaffAttendanceUser")
 }
 
 /// Basic audit log for operations (referral/commission important)
@@ -191,7 +198,7 @@ model AuditLog {
 model Department {
   id          Int            @id @default(autoincrement())
   name        String
-  code        String?        @unique
+  code        String? @unique
   description String?
   type        DepartmentType @default(CLINICAL)
   isActive    Boolean        @default(true)
@@ -205,21 +212,22 @@ model Department {
   expenses    Expense[]
   
   // FIXES: Missing back-relations
-  appointments Appointment[]
-  commissionSetups CommissionSetup[]
+  appointments Appointment[] 
+  commissionSetups CommissionSetup[] 
   departmentRevenues DepartmentRevenue[]
 
   @@index([name])
 }
 
 /// --------------------
-/// People: Patients & Staff
+/// People: 
+/// Patients & Staff
 /// --------------------
 
 model Patient {
   id             Int       @id @default(autoincrement())
-  userId         Int?      @unique
-  mrn            String?   @unique // medical record number
+  userId         Int? @unique
+  mrn            String? @unique // medical record number
   firstName      String
   lastName       String
   gender         Gender?
@@ -235,7 +243,7 @@ model Patient {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  user           User?     @relation(fields: [userId], references: [id])
+  user           User? @relation(fields: [userId], references: [id])
   appointments   Appointment[]
   medicalRecords MedicalRecord[]
   invoices       Invoice[]
@@ -247,15 +255,18 @@ model Patient {
   medicationLogs MedicationLog[]
   nurseNotes     NurseNote[]
   bloodRequests  BloodRequest[]
+  vitals         Vitals[]
+  
+  followUps      FollowUp[]
 
   @@index([lastName, firstName])
 }
 
 model Doctor {
   id            Int      @id @default(autoincrement())
-  userId        Int?     @unique
+  userId        Int? @unique
   doctorCode    String   @unique // internal doctor code (not referral)
-  referralCodeId Int?     // active referral code (most recent primary)
+  referralCodeId Int?
   firstName     String
   lastName      String
   speciality    String?
@@ -266,11 +277,11 @@ model Doctor {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  user          User?    @relation(fields: [userId], references: [id])
+  user          User? @relation(fields: [userId], references: [id])
   department    Department? @relation(fields: [departmentId], references: [id])
   appointments  Appointment[]
   prescriptions Prescription[]
-  labRequests   LabRequest[] // Corrected from LabTest[] in previous error
+  labRequests   LabRequest[] 
   radiologyRequests RadiologyRequest[]
   surgeryMembers SurgeryDoctor[]
   commissions   CommissionSetup[]        // setups created for this doctor
@@ -278,7 +289,6 @@ model Doctor {
   earnings      DoctorEarning[]
   commissionTransactions CommissionTransaction[]
 
-  // FIXES: Missing back-relations
   admissions    Admission[]
   bloodRequests BloodRequest[]
 
@@ -286,27 +296,27 @@ model Doctor {
 }
 
 model Nurse {
-  id         Int     @id @default(autoincrement())
-  userId     Int?    @unique
-  firstName  String
-  lastName   String
-  ward       String?
-  contact    String?
-  createdAt  DateTime @default(now())
+  id            Int     @id @default(autoincrement())
+  userId        Int? @unique
+  firstName     String
+  lastName      String
+  ward          String?
+  contact       String?
+  createdAt     DateTime @default(now())
 
-  user       User?   @relation(fields: [userId], references: [id])
+  user          User? @relation(fields: [userId], references: [id])
   medicationLogs MedicationLog[]
-  nurseNotes NurseNote[]
+  nurseNotes    NurseNote[]
 }
 
 model Pharmacist {
   id        Int     @id @default(autoincrement())
-  userId    Int?    @unique
+  userId    Int? @unique
   firstName String
   lastName  String
   createdAt DateTime @default(now())
 
-  user      User?   @relation(fields: [userId], references: [id])
+  user      User? @relation(fields: [userId], references: [id])
   sales     PharmacySale[]
 }
 
@@ -325,20 +335,18 @@ model Room {
   department  Department? @relation(fields: [departmentId], references: [id])
   beds        Bed[]
   
-  // FIX: Missing back-relation
   admissions  Admission[]
 }
 
 model Bed {
   id         Int     @id @default(autoincrement())
   roomId     Int
-  bedNumber  String
+  bedNumber  String 
   isOccupied Boolean @default(false)
   createdAt  DateTime @default(now())
 
   room       Room    @relation(fields: [roomId], references: [id])
 
-  // FIX: Missing back-relation
   admissions Admission[]
 }
 
@@ -358,10 +366,11 @@ model Admission {
   updatedAt        DateTime @updatedAt
 
   patient          Patient  @relation(fields: [patientId], references: [id])
-  room             Room?    @relation(fields: [roomId], references: [id])
-  bed              Bed?     @relation(fields: [bedId], references: [id])
+  room             Room? @relation(fields: [roomId], references: [id])
+  bed              Bed? @relation(fields: [bedId], references: [id])
   admittingDoctor  Doctor?  @relation(fields: [admittingDoctorId], references: [id])
   invoices         Invoice[]
+  vitals           Vitals[]
 }
 
 /// --------------------
@@ -369,7 +378,7 @@ model Admission {
 /// --------------------
 model Appointment {
   id                Int               @id @default(autoincrement())
-  appointmentNumber String?           @unique
+  appointmentNumber String? @unique
   patientId         Int
   doctorId          Int?
   departmentId      Int?
@@ -387,14 +396,16 @@ model Appointment {
 
   patient           Patient           @relation(fields: [patientId], references: [id])
   doctor            Doctor?           @relation(fields: [doctorId], references: [id])
-  department        Department?       @relation(fields: [departmentId], references: [id])
-  referralCode      ReferralCode?     @relation(fields: [referralCodeId], references: [id])
+  department        Department? @relation(fields: [departmentId], references: [id])
+  referralCode      ReferralCode? @relation(fields: [referralCodeId], references: [id])
   
   invoices          Invoice[]         // invoices (consultation, adjustments)
   prescriptions     Prescription[]
   labRequests       LabRequest[]
   radiologyRequests RadiologyRequest[]
   
+  followUps         FollowUp[]
+
   @@index([patientId, scheduledAt])
 }
 
@@ -407,9 +418,8 @@ model MedicalRecord {
   attachments Json?
   createdAt   DateTime @default(now())
   createdById Int?
-
   patient     Patient  @relation(fields: [patientId], references: [id])
-  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdBy   User? @relation(fields: [createdById], references: [id])
 }
 
 /// --------------------
@@ -430,27 +440,26 @@ model ReferralCode {
 
   doctor       Doctor   @relation(fields: [doctorId], references: [id])
   
-  // FIXES: Missing back-relations for all services and commission models
-  commissionSetups CommissionSetup[]
-  commissionTransactions CommissionTransaction[]
-  appointments Appointment[]
-  pharmacySales PharmacySale[]
-  prescriptions Prescription[]
-  labRequests LabRequest[]
-  radiologyRequests RadiologyRequest[]
-  surgeries Surgery[]
-  bloodRequests BloodRequest[]
+  commissionSetups CommissionSetup[] 
+  commissionTransactions CommissionTransaction[] 
+  appointments Appointment[] 
+  pharmacySales PharmacySale[] 
+  prescriptions Prescription[] 
+  labRequests LabRequest[] 
+  radiologyRequests RadiologyRequest[] 
+  surgeries Surgery[] 
+  bloodRequests BloodRequest[] 
 
   @@index([doctorId])
 }
 
 /// Commission configuration entries (admin sets what commission to apply)
 model CommissionSetup {
-  id           Int           @id @default(autoincrement())
-  createdById  Int?          // admin user who created
+  id           Int       @id @default(autoincrement())
+  createdById  Int?
   doctorId     Int?          // optional doctor-specific override
-  departmentId Int?          // optional department-level
-  referralCodeId Int?         // FIX 2: Added foreign key for ReferralCode
+  departmentId Int?
+  referralCodeId Int?
   source       SourceType
   commissionType CommissionType @default(PERCENTAGE)
   value        Decimal       // percentage (e.g., 10.5) OR flat amount as per type
@@ -460,10 +469,9 @@ model CommissionSetup {
   validTo      DateTime?
   createdAt    DateTime      @default(now())
 
-  createdBy    User?         @relation(fields: [createdById], references: [id])
-  doctor       Doctor?       @relation(fields: [doctorId], references: [id])
+  createdBy    User? @relation(fields: [createdById], references: [id])
+  doctor       Doctor? @relation(fields: [doctorId], references: [id])
   department   Department?   @relation(fields: [departmentId], references: [id])
-  // FIX 2: Added relation field for ReferralCode
   referralCode ReferralCode? @relation(fields: [referralCodeId], references: [id])
   
   @@index([source, doctorId, departmentId])
@@ -472,39 +480,36 @@ model CommissionSetup {
 /// CommissionTransaction logs when a specific billed event produces a commission for a doctor.
 model CommissionTransaction {
   id               Int             @id @default(autoincrement())
-  referralCodeId   Int?            // which referral code triggered this transaction (nullable)
+  referralCodeId   Int?
   doctorId         Int             // beneficiary doctor
   sourceType       SourceType
-  sourceId         Int?            // id of the source record (e.g., pharmacySaleId, labRequestId, etc.)
-  invoiceId        Int?            // invoice that carried the payment
+  sourceId         Int?
+  invoiceId        Int?
   amount           Decimal         @default(0.0) // computed amount credited to doctor
-  percentage       Decimal?        // commission percentage used (if PERCENTAGE)
+  percentage       Decimal?
   commissionType   CommissionType
   status           CommissionStatus @default(PENDING)
   notes            String?
   createdAt        DateTime        @default(now())
   paidAt           DateTime?
-
   referralCode     ReferralCode?   @relation(fields: [referralCodeId], references: [id])
   doctor           Doctor          @relation(fields: [doctorId], references: [id])
-  invoice          Invoice?        @relation(fields: [invoiceId], references: [id])
+  invoice          Invoice? @relation(fields: [invoiceId], references: [id])
   
-  // FIX: Missing back-relation
   payoutItem       CommissionPayoutItem?
-
+  
   @@index([doctorId, status, sourceType])
 }
 
 /// When admin runs payouts, they can be grouped into Payout records (settlement)
 model CommissionPayout {
   id           Int       @id @default(autoincrement())
-  payoutNumber String?   @unique
+  payoutNumber String? @unique
   totalAmount  Decimal   @default(0.0)
   issuedAt     DateTime?
   createdAt    DateTime  @default(now())
   createdById  Int?
   notes        String?
-
   createdBy    User?     @relation(fields: [createdById], references: [id])
   items        CommissionPayoutItem[]
 }
@@ -527,7 +532,7 @@ model DoctorEarning {
   doctorId     Int
   amount       Decimal   @default(0.0)
   sourceType   SourceType
-  sourceId     Int?      // original source reference
+  sourceId     Int?
   referralCode String?   // snapshot of referral code used (string for audit)
   note         String?
   createdAt    DateTime  @default(now())
@@ -542,7 +547,7 @@ model DoctorEarning {
 model Medicine {
   id            Int       @id @default(autoincrement())
   name          String
-  sku           String?   @unique
+  sku           String? @unique
   brand         String?
   description   String?
   unitPrice     Decimal   @default(0.0)
@@ -570,7 +575,7 @@ model PharmacyStock {
 
 model PurchaseOrder {
   id         Int      @id @default(autoincrement())
-  poNumber   String?  @unique
+  poNumber   String? @unique
   supplier   String?
   createdAt  DateTime @default(now())
   items      PurchaseOrderItem[]
@@ -589,7 +594,7 @@ model PurchaseOrderItem {
 
 model PharmacySale {
   id                 Int      @id @default(autoincrement())
-  saleNumber         String?  @unique
+  saleNumber         String? @unique
   prescriptionId     Int?     @unique 
   pharmacistId       Int?
   totalAmount        Decimal  @default(0.0)
@@ -599,7 +604,7 @@ model PharmacySale {
   createdAt          DateTime @default(now())
 
   prescription       Prescription? @relation(fields: [prescriptionId], references: [id])
-  pharmacist         Pharmacist?   @relation(fields: [pharmacistId], references: [id])
+  pharmacist         Pharmacist? @relation(fields: [pharmacistId], references: [id])
   referralCode       ReferralCode? @relation(fields: [referralCodeId], references: [id])
   
   items              PharmacySaleItem[]
@@ -623,20 +628,17 @@ model PharmacySaleItem {
 /// Prescriptions and items
 model Prescription {
   id                 Int      @id @default(autoincrement())
-  prescriptionNumber String?  @unique
+  prescriptionNumber String? @unique
   patientId          Int
   doctorId           Int?
-  // FIX 1: Added foreign key and relation for Appointment
-  appointmentId      Int?
+  appointmentId      Int? // Foreign key added
   issuedAt           DateTime @default(now())
   notes              String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   referralCodeId     Int?
-
   patient            Patient @relation(fields: [patientId], references: [id])
   doctor             Doctor? @relation(fields: [doctorId], references: [id])
-  // FIX 1: Added relation field for Appointment
   appointment        Appointment? @relation(fields: [appointmentId], references: [id])
   referralCode       ReferralCode? @relation(fields: [referralCodeId], references: [id])
   
@@ -674,7 +676,7 @@ model LabTestTemplate {
 
 model LabRequest {
   id              Int      @id @default(autoincrement())
-  requestNumber   String?  @unique
+  requestNumber   String? @unique
   patientId       Int
   doctorId        Int?
   appointmentId   Int?
@@ -714,7 +716,7 @@ model RadiologyTemplate {
 
 model RadiologyRequest {
   id              Int      @id @default(autoincrement())
-  requestNumber   String?  @unique
+  requestNumber   String? @unique
   patientId       Int
   doctorId        Int?
   appointmentId   Int?
@@ -744,7 +746,7 @@ model RadiologyRequest {
 /// --------------------
 model Surgery {
   id              Int      @id @default(autoincrement())
-  surgeryNumber   String?  @unique
+  surgeryNumber   String? @unique
   patientId       Int
   scheduledAt     DateTime
   status          SurgeryStatus @default(SCHEDULED)
@@ -767,7 +769,8 @@ model SurgeryDoctor {
   id              Int      @id @default(autoincrement())
   surgeryId       Int
   doctorId        Int
-  role            String?  // Surgeon, Assistant, Anesthetist
+  role            String?
+  // Surgeon, Assistant, Anesthetist
 
   surgery         Surgery @relation(fields: [surgeryId], references: [id])
   doctor          Doctor @relation(fields: [doctorId], references: [id])
@@ -807,7 +810,6 @@ model Invoice {
   payments        Payment[]
   invoiceItems    InvoiceItem[]
   
-  // FIX: Missing back-relation
   commissionTransactions CommissionTransaction[]
 
   @@index([patientId, issuedAt])
@@ -858,7 +860,6 @@ model DepartmentRevenue {
   date            DateTime
   totalAmount     Decimal @default(0.0)
 
-  // FIX: Missing back-relation
   department      Department @relation(fields: [departmentId], references: [id])
 }
 
@@ -866,14 +867,13 @@ model DepartmentRevenue {
 /// Medication Administration
 /// --------------------
 model MedicationLog {
-  id             Int       @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   patientId      Int
   nurseId        Int
   medicineId     Int?
   administeredAt DateTime @default(now())
   dosage         String?
   notes          String?
-
   patient        Patient @relation(fields: [patientId], references: [id])
   nurse          Nurse @relation(fields: [nurseId], references: [id])
   medicine       Medicine? @relation(fields: [medicineId], references: [id])
@@ -896,7 +896,8 @@ model NurseNote {
 model Attachment {
   id        Int      @id @default(autoincrement())
   url       String
-  type      String?  // e.g., report/pdf, image/png
+  type      String?
+  // e.g., report/pdf, image/png
   meta      Json?
   createdAt DateTime @default(now())
 }
@@ -968,4 +969,108 @@ model BloodRequest {
   @@index([doctorId, referralCodeId, status])
 }
 
+model Vitals {
+  id             Int         @id @default(autoincrement())
+  patientId      Int
+  admissionId    Int?        // optional if recorded outside admission
+  recordedById   Int?        // staff user who entered the vitals
+  recordedAt     DateTime    @default(now())
 
+  // Core measurements
+  temperature    Decimal?    @db.Decimal(5,2)  // Celsius
+  pulse          Int?        // Beats per minute
+  respiration    Int?        // Breaths per minute
+  systolic       Int?        // mmHg
+  diastolic      Int?        // mmHg
+  spo2           Int?        // Oxygen saturation %
+  weight         Decimal?    @db.Decimal(6,2)  // kg
+  height         Decimal?    @db.Decimal(5,2)  // cm
+  bmi            Decimal?    @db.Decimal(5,2)
+  painScore      Int?        // 0–10
+  remarks        String? @db.Text
+
+  // Meta
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Relations
+  patient        Patient     @relation(fields: [patientId], references: [id])
+  admission      Admission? @relation(fields: [admissionId], references: [id])
+  recordedBy     User? @relation("UserRecordedVitals", fields: [recordedById], references: [id])
+
+  @@map("vitals")
+  @@index([patientId])
+  @@index([admissionId])
+  @@index([recordedAt])
+}
+
+model FollowUp {
+  id             String       @id @default(uuid())
+  patientId      Int
+  doctorId       Int
+  appointmentId  Int?
+  followUpDate   DateTime
+  purpose        FollowUpPurpose
+  notes          String?
+  feedback       String?
+  status         FollowUpStatus  @default(SCHEDULED)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  // ====== Relations ======
+  patient        Patient    @relation(fields: [patientId], references: [id])
+  doctor         User       @relation("FollowUpDoctor", fields: [doctorId], references: [id])
+  appointment    Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([followUpDate])
+  @@index([status])
+  @@map("follow_ups")
+}
+
+enum FollowUpPurpose {
+  REVIEW
+  LAB_RESULT
+  PROCEDURE
+  FOLLOW_CHECKUP
+}
+
+enum FollowUpStatus {
+  SCHEDULED
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+model StaffAttendance {
+  id            String              @id @default(uuid())
+  staffId       Int                 // FIX: Changed from BigInt to Int
+  date          DateTime
+  shiftType     ShiftType
+  status        AttendanceStatus    @default(PRESENT)
+  checkInTime   DateTime?
+  checkOutTime  DateTime?
+  remarks       String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  // ===== Relations =====
+  // FIX: Added custom relation name "StaffAttendanceUser"
+  staff         User                @relation("StaffAttendanceUser", fields: [staffId], references: [id]) 
+
+  @@index([staffId])
+  @@index([date])
+  @@map("staff_attendance")
+}
+
+enum ShiftType {
+  DAY
+  NIGHT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  ON_LEAVE
+}

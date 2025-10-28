@@ -1,0 +1,42 @@
+{
+  "id": "beds",
+  "title": "Bed Management",
+  "description": "Tracks bed availability and allocation across hospital rooms.",
+  "route": "/beds",
+  "icon": "BedDouble",
+  "entity": "Bed",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "Nurse", "Receptionist"],
+    "create": ["Admin"],
+    "edit": ["Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/beds",
+    "get": "/api/beds/:id",
+    "create": "/api/beds",
+    "update": "/api/beds/:id",
+    "delete": "/api/beds/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "bedNumber", "label": "Bed Number", "type": "string", "required": true, "showInList": true },
+    { "name": "roomId", "label": "Room", "type": "relation", "relationEntity": "rooms", "relationField": "roomNumber", "showInList": true },
+    { "name": "status", "label": "Status", "type": "enum", "options": ["AVAILABLE", "OCCUPIED", "CLEANING"], "widget": "badge", "default": "AVAILABLE", "showInList": true },
+    { "name": "patientId", "label": "Assigned Patient", "type": "relation", "relationEntity": "patients", "relationField": "fullName", "nullable": true, "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "rooms", "type": "ManyToOne", "foreignKey": "roomId" },
+    { "entity": "patients", "type": "OneToOne", "foreignKey": "bedId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Bed allocation is linked to room occupancy and patient admission. This ensures optimal hospital capacity usage.",
+    "uiLogic": "Color-coded availability simplifies management of cleaning and occupied beds."
+  }
+}

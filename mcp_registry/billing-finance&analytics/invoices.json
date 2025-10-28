@@ -1,0 +1,50 @@
+{
+  "id": "invoices",
+  "title": "Invoices",
+  "description": "Billing records for appointments, lab, pharmacy, or radiology services.",
+  "schema": {
+    "invoiceNumber": "string",
+    "invoiceType": "enum:InvoiceType",
+    "appointmentId": "relation:appointments",
+    "patientId": "relation:patients",
+    "totalAmount": "decimal",
+    "paidAmount": "decimal",
+    "paymentStatus": "enum:PaymentStatus",
+    "issuedAt": "datetime",
+    "dueAt": "datetime",
+    "items": "submodel:invoiceitems"
+  },
+  "submodels": {
+    "invoiceitems": {
+      "description": "string",
+      "quantity": "number",
+      "unitPrice": "decimal",
+      "total": "decimal"
+    }
+  },
+  "ui": {
+    "tableView": [
+      "invoiceNumber",
+      "patientId",
+      "invoiceType",
+      "totalAmount",
+      "paymentStatus"
+    ],
+    "formView": {
+      "tabs": {
+        "Invoice Info": ["invoiceNumber", "invoiceType", "patientId", "issuedAt"],
+        "Items": ["items"]
+      }
+    }
+  },
+  "relations": {
+    "appointmentId": "appointments.id",
+    "patientId": "patients.id"
+  },
+  "permissions": {
+    "create": ["ACCOUNTANT"],
+    "update": ["ACCOUNTANT"],
+    "view": ["DOCTOR", "ACCOUNTANT", "PATIENT"],
+    "delete": ["SYSTEM_ADMIN"]
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "radiologyreports",
+  "title": "Radiology Reports",
+  "description": "Stores imaging results uploaded by radiologists, linked with corresponding requests.",
+  "route": "/radiologyreports",
+  "icon": "FileScan",
+  "entity": "RadiologyReport",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Doctor", "Radiologist", "Admin"],
+    "create": ["Radiologist"],
+    "edit": ["Radiologist", "Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/radiologyreports",
+    "get": "/api/radiologyreports/:id",
+    "create": "/api/radiologyreports",
+    "update": "/api/radiologyreports/:id",
+    "delete": "/api/radiologyreports/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "radiologyRequestId", "type": "relation", "relationEntity": "radiologyrequests", "relationField": "id", "required": true },
+    { "name": "radiologistId", "type": "relation", "relationEntity": "radiologists", "relationField": "fullName", "showInList": true },
+    { "name": "findings", "type": "textarea", "label": "Findings", "required": true },
+    { "name": "impression", "type": "textarea", "label": "Impression / Summary" },
+    { "name": "reportFile", "type": "file", "label": "Report File (PDF)" },
+    { "name": "status", "type": "enum", "options": ["DRAFT", "FINALIZED"], "widget": "badge", "default": "DRAFT", "showInList": true },
+    { "name": "createdAt", "type": "datetime", "readOnly": true }
+  ],
+
+  "relations": [
+    { "entity": "radiologyrequests", "type": "ManyToOne", "foreignKey": "radiologyRequestId" },
+    { "entity": "radiologists", "type": "ManyToOne", "foreignKey": "radiologistId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Each report closes a radiology request and supports diagnosis completion. Stored securely for audit and medical record continuity.",
+    "uiLogic": "File upload + status badges give clear indication of report readiness."
+  }
+}

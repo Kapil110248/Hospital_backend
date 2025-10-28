@@ -1,0 +1,64 @@
+{
+  "id": "labrequests",
+  "title": "Laboratory Requests",
+  "description": "Handles requests for lab investigations raised by doctors during consultations. Integrates with LabTechnicians and LabResults.",
+  "route": "/labrequests",
+  "icon": "FlaskConical",
+  "entity": "LabRequest",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Doctor", "LabTechnician", "Admin"],
+    "create": ["Doctor"],
+    "edit": ["Doctor", "Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/labrequests",
+    "get": "/api/labrequests/:id",
+    "create": "/api/labrequests",
+    "update": "/api/labrequests/:id",
+    "delete": "/api/labrequests/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "consultationId", "type": "relation", "relationEntity": "consultations", "relationField": "id", "required": true },
+    { "name": "patientId", "type": "relation", "relationEntity": "patients", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "doctorId", "type": "relation", "relationEntity": "doctors", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "testType", "label": "Test Type", "type": "enum", "options": ["CBC", "Blood Sugar", "Lipid Profile", "LFT", "RFT", "Urine Test"], "widget": "select", "showInList": true },
+    { "name": "priority", "type": "enum", "options": ["ROUTINE", "URGENT"], "widget": "badge", "default": "ROUTINE", "showInList": true },
+    { "name": "status", "type": "enum", "options": ["PENDING", "IN_PROGRESS", "COMPLETED"], "widget": "badge", "default": "PENDING", "showInList": true },
+    { "name": "requestedAt", "type": "datetime", "readOnly": true, "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "consultations", "type": "ManyToOne", "foreignKey": "consultationId" },
+    { "entity": "labresults", "type": "OneToOne", "foreignKey": "labRequestId" }
+  ],
+
+  "ui": {
+    "listView": {
+      "title": "Lab Requests",
+      "columns": ["patientId", "doctorId", "testType", "priority", "status"],
+      "filters": ["priority", "status"],
+      "searchFields": ["patientId", "testType"],
+      "actions": ["view", "edit", "delete"]
+    },
+    "formView": {
+      "title": "Create Lab Request",
+      "layout": [
+        ["consultationId", "patientId"],
+        ["doctorId", "testType"],
+        ["priority", "status"]
+      ],
+      "actions": ["save", "cancel"]
+    }
+  },
+
+  "reasoning": {
+    "businessLogic": "Doctors initiate lab tests based on diagnosis. Each request is tracked for completion by lab technicians.",
+    "uiLogic": "Streamlined workflow for doctors to request and labs to update status — ensuring test turnaround visibility."
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "prescriptions",
+  "title": "Prescriptions",
+  "description": "Stores prescription details given by doctors during consultation. Linked to pharmacy module for fulfillment.",
+  "route": "/prescriptions",
+  "icon": "PillBottle",
+  "entity": "Prescription",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Doctor", "Pharmacist", "Admin"],
+    "create": ["Doctor"],
+    "edit": ["Doctor", "Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/prescriptions",
+    "get": "/api/prescriptions/:id",
+    "create": "/api/prescriptions",
+    "update": "/api/prescriptions/:id",
+    "delete": "/api/prescriptions/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "consultationId", "type": "relation", "relationEntity": "consultations", "relationField": "id", "required": true, "showInList": true },
+    { "name": "doctorId", "type": "relation", "relationEntity": "doctors", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "patientId", "type": "relation", "relationEntity": "patients", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "medicineName", "type": "string", "required": true, "showInList": true },
+    { "name": "dosage", "type": "string", "placeholder": "500mg", "showInList": true },
+    { "name": "frequency", "type": "enum", "options": ["Once Daily", "Twice Daily", "Thrice Daily"], "showInList": true },
+    { "name": "duration", "type": "string", "placeholder": "5 days", "showInList": true },
+    { "name": "notes", "type": "text", "placeholder": "Before meal or after meal" }
+  ],
+
+  "relations": [
+    { "entity": "consultations", "type": "ManyToOne", "foreignKey": "consultationId" },
+    { "entity": "patients", "type": "ManyToOne", "foreignKey": "patientId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Prescriptions record treatment details and drive pharmacy order fulfillment.",
+    "uiLogic": "Compact, searchable, and linked to consultation records for real-time drug availability checks."
+  }
+}

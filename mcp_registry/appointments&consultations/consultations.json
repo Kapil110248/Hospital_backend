@@ -1,0 +1,65 @@
+{
+  "id": "consultations",
+  "title": "Consultations",
+  "description": "Stores doctor consultation records with patient symptoms, findings, diagnosis, and recommended treatment.",
+  "route": "/consultations",
+  "icon": "Stethoscope",
+  "entity": "Consultation",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Doctor", "Admin"],
+    "create": ["Doctor"],
+    "edit": ["Doctor", "Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/consultations",
+    "get": "/api/consultations/:id",
+    "create": "/api/consultations",
+    "update": "/api/consultations/:id",
+    "delete": "/api/consultations/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "appointmentId", "type": "relation", "relationEntity": "appointments", "relationField": "id", "required": true },
+    { "name": "patientId", "type": "relation", "relationEntity": "patients", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "doctorId", "type": "relation", "relationEntity": "doctors", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "symptoms", "type": "textarea", "label": "Symptoms" },
+    { "name": "diagnosis", "type": "textarea", "label": "Diagnosis" },
+    { "name": "treatmentPlan", "type": "textarea", "label": "Treatment Plan" },
+    { "name": "nextVisit", "type": "date", "label": "Next Visit", "nullable": true },
+    { "name": "status", "type": "enum", "options": ["ONGOING", "COMPLETED"], "widget": "badge", "default": "ONGOING" }
+  ],
+
+  "relations": [
+    { "entity": "appointments", "type": "OneToOne", "foreignKey": "appointmentId" },
+    { "entity": "prescriptions", "type": "OneToMany", "foreignKey": "consultationId" }
+  ],
+
+  "ui": {
+    "formView": {
+      "title": "Consultation Entry",
+      "layout": [
+        ["appointmentId", "patientId", "doctorId"],
+        ["symptoms"],
+        ["diagnosis"],
+        ["treatmentPlan"],
+        ["nextVisit"]
+      ],
+      "actions": ["save", "cancel"]
+    },
+    "listView": {
+      "title": "Consultation Records",
+      "columns": ["patientId", "doctorId", "diagnosis", "status"],
+      "filters": ["doctorId", "status"]
+    }
+  },
+
+  "reasoning": {
+    "businessLogic": "Consultations link the medical reasoning of each patient’s visit. Each record generates prescriptions and lab tests.",
+    "uiLogic": "Doctor-facing interface optimized for quick text input and next-visit scheduling."
+  }
+}

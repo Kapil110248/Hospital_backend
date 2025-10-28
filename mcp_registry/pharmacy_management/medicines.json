@@ -1,0 +1,45 @@
+{
+  "id": "medicines",
+  "title": "Medicine Master",
+  "description": "Catalog of all medicines available in the hospital pharmacy, including composition, dosage form, and pricing.",
+  "route": "/medicines",
+  "icon": "Pill",
+  "entity": "Medicine",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "Pharmacist", "Doctor"],
+    "create": ["Admin", "Pharmacist"],
+    "edit": ["Admin", "Pharmacist"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/medicines",
+    "get": "/api/medicines/:id",
+    "create": "/api/medicines",
+    "update": "/api/medicines/:id",
+    "delete": "/api/medicines/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "name", "label": "Medicine Name", "type": "string", "required": true, "showInList": true },
+    { "name": "genericName", "label": "Generic Name", "type": "string", "showInList": true },
+    { "name": "category", "label": "Category", "type": "enum", "options": ["Tablet", "Capsule", "Syrup", "Injection", "Cream", "Drops"], "widget": "select", "showInList": true },
+    { "name": "composition", "label": "Composition", "type": "text", "showInList": false },
+    { "name": "manufacturer", "label": "Manufacturer", "type": "string", "showInList": true },
+    { "name": "unitPrice", "label": "Unit Price", "type": "currency", "required": true, "showInList": true },
+    { "name": "expiryDate", "label": "Expiry Date", "type": "date", "showInList": true },
+    { "name": "status", "label": "Status", "type": "enum", "options": ["AVAILABLE", "OUT_OF_STOCK"], "widget": "badge", "default": "AVAILABLE", "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "pharmacystock", "type": "OneToMany", "foreignKey": "medicineId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Defines the hospital’s master list of medicines. Keeps composition and expiry records accurate for safety compliance.",
+    "uiLogic": "Simple searchable medicine catalog with category and status filters."
+  }
+}

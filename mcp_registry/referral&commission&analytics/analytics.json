@@ -1,0 +1,134 @@
+{
+  "id": "analytics",
+  "title": "Analytics & Insights",
+  "description": "Provides visual and tabular analytics for hospital operations, patient care, revenue, and staff performance. Supports charts, KPIs, and filters across departments.",
+  "route": "/reports/analytics",
+  "icon": "BarChart3",
+  "entity": "Analytics",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "Accountant", "Doctor"],
+    "export": ["Admin", "Accountant"]
+  },
+
+  "api": {
+    "summary": "/api/analytics/summary",
+    "financials": "/api/analytics/financials",
+    "patients": "/api/analytics/patients",
+    "appointments": "/api/analytics/appointments",
+    "inventory": "/api/analytics/inventory",
+    "pharmacy": "/api/analytics/pharmacy",
+    "export": "/api/analytics/export"
+  },
+
+  "widgets": [
+    {
+      "id": "revenueSummary",
+      "title": "Revenue Overview",
+      "type": "kpi",
+      "metrics": [
+        { "label": "Total Revenue", "source": "financials.totalRevenue", "format": "currency" },
+        { "label": "Pending Payments", "source": "financials.pendingPayments", "format": "currency" },
+        { "label": "Monthly Growth", "source": "financials.monthlyGrowth", "format": "percent" }
+      ],
+      "refreshInterval": "daily"
+    },
+    {
+      "id": "patientStats",
+      "title": "Patient Trends",
+      "type": "chart-line",
+      "source": "patients.dailyRegistrations",
+      "xField": "date",
+      "yField": "count",
+      "filters": ["department", "gender", "ageGroup"]
+    },
+    {
+      "id": "appointmentPerformance",
+      "title": "Appointment Volume",
+      "type": "chart-bar",
+      "source": "appointments.completedAppointments",
+      "xField": "department",
+      "yField": "count",
+      "colorScheme": "blue"
+    },
+    {
+      "id": "inventoryStatus",
+      "title": "Low Stock Alerts",
+      "type": "table",
+      "columns": ["itemName", "currentStock", "threshold", "lastRestocked"],
+      "source": "inventory.lowStockItems",
+      "maxRows": 10
+    },
+    {
+      "id": "pharmacySales",
+      "title": "Top Selling Medicines",
+      "type": "chart-pie",
+      "source": "pharmacy.topSelling",
+      "labelField": "medicineName",
+      "valueField": "quantitySold"
+    }
+  ],
+
+  "filters": [
+    { "name": "dateRange", "label": "Date Range", "type": "daterange" },
+    { "name": "department", "label": "Department", "type": "select", "source": "/api/departments" },
+    { "name": "revenueType", "label": "Revenue Type", "type": "select", "options": ["CONSULTATION", "LAB", "PHARMACY", "ROOM", "SURGERY"] }
+  ],
+
+  "ui": {
+    "dashboardView": {
+      "title": "Analytics Dashboard",
+      "layout": [
+        ["revenueSummary"],
+        ["patientStats"],
+        ["appointmentPerformance", "pharmacySales"],
+        ["inventoryStatus"]
+      ],
+      "refreshButton": true,
+      "exportOptions": ["PDF", "Excel", "CSV"]
+    },
+    "detailView": {
+      "title": "Detailed Analytics Report",
+      "sections": [
+        {
+          "title": "Financial Breakdown",
+          "widgets": ["revenueSummary"]
+        },
+        {
+          "title": "Patient and Appointment Trends",
+          "widgets": ["patientStats", "appointmentPerformance"]
+        },
+        {
+          "title": "Operational Insights",
+          "widgets": ["inventoryStatus", "pharmacySales"]
+        }
+      ]
+    }
+  },
+
+  "actions": [
+    {
+      "id": "refreshDashboard",
+      "label": "Refresh Data",
+      "type": "custom",
+      "endpoint": "/api/analytics/refresh",
+      "method": "POST",
+      "successMessage": "Analytics data refreshed successfully!"
+    },
+    {
+      "id": "exportReport",
+      "label": "Export Analytics",
+      "type": "export",
+      "endpoint": "/api/analytics/export",
+      "method": "GET",
+      "formats": ["PDF", "Excel", "CSV"],
+      "successMessage": "Analytics exported successfully!"
+    }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Analytics provides the hospital with real-time operational intelligence. Administrators can monitor patient inflow, revenue trends, and departmental performance to support data-driven decisions.",
+    "uiLogic": "The dashboard combines KPIs and visual charts in an interactive layout. Filters and export options allow users to customize and download insights for reporting."
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "id": "staffattendance",
+  "title": "Staff Attendance",
+  "description": "Logs attendance records for all hospital staff including doctors, nurses, and technicians. Integrated with duty rosters and shifts.",
+  "route": "/staffattendance",
+  "icon": "Clock",
+  "entity": "StaffAttendance",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "HR"],
+    "create": ["Admin", "HR"],
+    "edit": ["Admin", "HR"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/staffattendance",
+    "get": "/api/staffattendance/:id",
+    "create": "/api/staffattendance",
+    "update": "/api/staffattendance/:id",
+    "delete": "/api/staffattendance/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "staffId", "label": "Staff ID", "type": "relation", "relationEntity": "users", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "date", "label": "Date", "type": "date", "required": true, "showInList": true },
+    { "name": "shiftType", "type": "enum", "options": ["DAY", "NIGHT"], "widget": "select", "showInList": true },
+    { "name": "status", "type": "enum", "options": ["PRESENT", "ABSENT", "LATE", "ON_LEAVE"], "widget": "badge", "default": "PRESENT", "showInList": true },
+    { "name": "checkInTime", "type": "time" },
+    { "name": "checkOutTime", "type": "time" },
+    { "name": "remarks", "type": "text" }
+  ],
+
+  "ui": {
+    "listView": {
+      "title": "Attendance Logs",
+      "columns": ["staffId", "date", "shiftType", "status"],
+      "filters": ["shiftType", "status"],
+      "searchFields": ["staffId"]
+    },
+    "formView": {
+      "title": "Mark Attendance",
+      "layout": [
+        ["staffId", "date"],
+        ["shiftType", "status"],
+        ["checkInTime", "checkOutTime"],
+        ["remarks"]
+      ],
+      "actions": ["save", "cancel"]
+    }
+  },
+
+  "reasoning": {
+    "businessLogic": "Attendance helps HR track working hours, payroll, and compliance. Each record maps to duty roster shifts.",
+    "uiLogic": "The attendance view integrates with daily shift data and highlights absences or late marks with color-coded badges."
+  }
+}

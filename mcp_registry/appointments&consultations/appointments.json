@@ -1,0 +1,76 @@
+{
+  "id": "appointments",
+  "title": "Appointments",
+  "description": "Handles booking and management of doctor appointments, integrated with patients, doctors, and receptionists.",
+  "route": "/appointments",
+  "icon": "CalendarDays",
+  "entity": "Appointment",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "Receptionist", "Doctor"],
+    "create": ["Receptionist", "Admin"],
+    "edit": ["Admin", "Receptionist"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/appointments",
+    "get": "/api/appointments/:id",
+    "create": "/api/appointments",
+    "update": "/api/appointments/:id",
+    "delete": "/api/appointments/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "patientId", "type": "relation", "relationEntity": "patients", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "doctorId", "type": "relation", "relationEntity": "doctors", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "receptionistId", "type": "relation", "relationEntity": "receptionists", "relationField": "fullName", "showInList": false },
+    { "name": "appointmentDate", "label": "Date", "type": "datetime", "required": true, "showInList": true },
+    { "name": "purpose", "label": "Purpose", "type": "string", "placeholder": "Consultation / Follow-up", "showInList": true },
+    { "name": "status", "type": "enum", "options": ["SCHEDULED", "CHECKED_IN", "CANCELLED", "COMPLETED"], "default": "SCHEDULED", "widget": "badge", "showInList": true },
+    { "name": "notes", "type": "textarea", "showInList": false }
+  ],
+
+  "relations": [
+    { "entity": "patients", "type": "ManyToOne", "foreignKey": "patientId" },
+    { "entity": "doctors", "type": "ManyToOne", "foreignKey": "doctorId" },
+    { "entity": "consultations", "type": "OneToOne", "foreignKey": "appointmentId" }
+  ],
+
+  "ui": {
+    "listView": {
+      "title": "Appointment List",
+      "columns": ["appointmentDate", "patientId", "doctorId", "purpose", "status"],
+      "filters": ["doctorId", "status"],
+      "actions": ["view", "edit", "delete"],
+      "searchFields": ["patientId", "doctorId"]
+    },
+    "formView": {
+      "title": "Book Appointment",
+      "layout": [
+        ["patientId", "doctorId"],
+        ["appointmentDate"],
+        ["purpose"],
+        ["status"]
+      ],
+      "actions": [
+        {
+          "id": "book",
+          "label": "Save Appointment",
+          "type": "submit",
+          "endpoint": "/api/appointments",
+          "method": "POST",
+          "successMessage": "Appointment booked successfully!"
+        },
+        { "id": "cancel", "label": "Cancel", "type": "cancel" }
+      ]
+    }
+  },
+
+  "reasoning": {
+    "businessLogic": "Appointments are the first step of patient interaction. They must link patient, doctor, and receptionist with accurate scheduling.",
+    "uiLogic": "UI follows a timeline view for easy doctor-wise slot tracking and appointment confirmation."
+  }
+}

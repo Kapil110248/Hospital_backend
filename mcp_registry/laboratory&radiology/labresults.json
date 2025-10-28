@@ -1,0 +1,62 @@
+{
+  "id": "labresults",
+  "title": "Lab Test Results",
+  "description": "Stores the finalized reports and findings for lab tests. Linked with LabRequests and accessible by doctors.",
+  "route": "/labresults",
+  "icon": "TestTubeDiagonal",
+  "entity": "LabResult",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Doctor", "LabTechnician", "Admin"],
+    "create": ["LabTechnician"],
+    "edit": ["LabTechnician"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/labresults",
+    "get": "/api/labresults/:id",
+    "create": "/api/labresults",
+    "update": "/api/labresults/:id",
+    "delete": "/api/labresults/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "labRequestId", "type": "relation", "relationEntity": "labrequests", "relationField": "id", "required": true, "showInList": true },
+    { "name": "technicianId", "type": "relation", "relationEntity": "labtechnicians", "relationField": "fullName", "showInList": true },
+    { "name": "testResult", "type": "text", "label": "Test Result", "required": true },
+    { "name": "remarks", "type": "text", "label": "Remarks" },
+    { "name": "resultFile", "type": "file", "label": "Attachment (PDF)" },
+    { "name": "status", "type": "enum", "options": ["PENDING_VERIFICATION", "VERIFIED"], "default": "PENDING_VERIFICATION", "widget": "badge", "showInList": true },
+    { "name": "verifiedAt", "type": "datetime", "readOnly": true, "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "labrequests", "type": "OneToOne", "foreignKey": "labRequestId" },
+    { "entity": "labtechnicians", "type": "ManyToOne", "foreignKey": "technicianId" }
+  ],
+
+  "ui": {
+    "listView": {
+      "title": "Lab Test Results",
+      "columns": ["labRequestId", "technicianId", "status", "verifiedAt"],
+      "filters": ["status"]
+    },
+    "formView": {
+      "title": "Enter Lab Result",
+      "layout": [
+        ["labRequestId", "technicianId"],
+        ["testResult"],
+        ["remarks", "resultFile"]
+      ],
+      "actions": ["save", "cancel"]
+    }
+  },
+
+  "reasoning": {
+    "businessLogic": "Lab results confirm or update diagnoses and are essential for treatment continuation.",
+    "uiLogic": "Technicians upload PDFs or enter textual results, while doctors can view verified ones instantly."
+  }
+}

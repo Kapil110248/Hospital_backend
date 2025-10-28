@@ -1,0 +1,45 @@
+{
+  "id": "admissions",
+  "title": "Patient Admissions",
+  "description": "Manages the admission process for patients, including assigned doctor, bed, and admission reason.",
+  "route": "/admissions",
+  "icon": "LogIn",
+  "entity": "Admission",
+  "version": "1.0.0",
+
+  "permissions": {
+    "view": ["Admin", "Receptionist", "Nurse"],
+    "create": ["Receptionist", "Admin"],
+    "edit": ["Admin"],
+    "delete": ["Admin"]
+  },
+
+  "api": {
+    "list": "/api/admissions",
+    "get": "/api/admissions/:id",
+    "create": "/api/admissions",
+    "update": "/api/admissions/:id",
+    "delete": "/api/admissions/:id"
+  },
+
+  "fields": [
+    { "name": "id", "type": "uuid", "primary": true },
+    { "name": "patientId", "type": "relation", "relationEntity": "patients", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "doctorId", "type": "relation", "relationEntity": "doctors", "relationField": "fullName", "required": true, "showInList": true },
+    { "name": "bedId", "type": "relation", "relationEntity": "beds", "relationField": "bedNumber", "required": true, "showInList": true },
+    { "name": "admissionDate", "type": "date", "required": true, "showInList": true },
+    { "name": "admissionReason", "type": "textarea" },
+    { "name": "status", "type": "enum", "options": ["ADMITTED", "DISCHARGED"], "widget": "badge", "default": "ADMITTED", "showInList": true }
+  ],
+
+  "relations": [
+    { "entity": "patients", "type": "ManyToOne", "foreignKey": "patientId" },
+    { "entity": "doctors", "type": "ManyToOne", "foreignKey": "doctorId" },
+    { "entity": "beds", "type": "ManyToOne", "foreignKey": "bedId" }
+  ],
+
+  "reasoning": {
+    "businessLogic": "Every patient admission is logged with their doctor and bed. It connects the patient lifecycle with billing and discharge modules.",
+    "uiLogic": "Receptionists can quickly assign beds and track inpatients using status badges."
+  }
+}

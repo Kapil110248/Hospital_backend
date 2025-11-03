@@ -1,0 +1,784 @@
+{
+    "version": "1.1",
+    "meta": {
+      "name": "HMS Core MCP Registry (Modular, Frontend-first)",
+      "description": "Modular MCP registry derived from Prisma schema. Optimized for frontend scaffolding and backend API generation for hospital management.",
+      "generatedAt": "2025-10-28T00:00:00Z",
+      "prismaSchemaVersion": "approved-schema-v1",
+      "notes": [
+        "Use publicId for external routes.",
+        "Decimal fields expected as numeric(14,2) at DB level.",
+        "Soft-delete pattern: use isActive + deletedAt."
+      ]
+    },
+    "enums": {
+      "UserRole": ["ADMIN","DOCTOR","NURSE","PHARMACIST","LAB_TECH","RADIOLOGIST","FINANCE","HR","PATIENT","AUDITOR","RECEPTION"],
+      "Gender": ["MALE","FEMALE","OTHER","UNKNOWN"],
+      "AppointmentStatus": ["SCHEDULED","CONFIRMED","CHECKED_IN","IN_CONSULTATION","COMPLETED","CANCELLED","NO_SHOW","RESCHEDULED"],
+      "PaymentMode": ["CASH","FIB","CARD","INSURANCE","NEFT","UPI","OTHER"],
+      "PaymentStatus": ["PENDING","PAID","PARTIAL","REFUNDED","FAILED"],
+      "TestStatus": ["REQUESTED","IN_PROCESS","COMPLETED","CANCELLED","REVIEW_PENDING"],
+      "InvoiceType": ["CONSULTATION","LAB","RADIOLOGY","PHARMACY","PROCEDURE","ADMISSION","OTHER"],
+      "SourceType": ["PHARMACY","LAB","RADIOLOGY","PROCEDURE","BLOOD_BANK","CONSULTATION","OTHER"],
+      "DepartmentType": ["CLINICAL","NON_CLINICAL","SUPPORT","ADMIN"]
+    },
+    "models": {
+      "User": {
+        "table": "User",
+        "description": "Authentication + staff/patient account",
+        "fields": [
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"email","type":"string","required":true},
+          {"name":"password","type":"string","required":true,"masked":true},
+          {"name":"role","type":"enum","enumName":"UserRole","required":true},
+          {"name":"displayName","type":"string"},
+          {"name":"phone","type":"string"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"deletedAt","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"},
+          {"name":"updatedAt","type":"datetime","autoUpdate":true}
+        ],
+        "relations": {
+          "doctor":"1:1 -> Doctor.userId",
+          "patient":"1:1 -> Patient.userId",
+          "pharmacist":"1:1 -> Pharmacist.userId"
+        },
+        "endpoints": {
+          "list": {"method":"GET","url":"/api/users"},
+          "get": {"method":"GET","url":"/api/users/{publicId}"},
+          "create": {"method":"POST","url":"/api/users"},
+          "update": {"method":"PUT","url":"/api/users/{publicId}"},
+          "delete": {"method":"DELETE","url":"/api/users/{publicId}"}
+        },
+        "actions": ["toggleActive","resetPassword"],
+        "uiMeta": {
+          "listColumns": ["publicId","email","displayName","role","isActive","createdAt"],
+          "formFields": [
+            {"name":"email","widget":"text"},
+            {"name":"password","widget":"password"},
+            {"name":"displayName","widget":"text"},
+            {"name":"role","widget":"select","options":"enum:UserRole"},
+            {"name":"phone","widget":"tel"},
+            {"name":"isActive","widget":"checkbox"}
+          ],
+          "permissions": {
+            "list":["ADMIN","HR","AUDITOR"],
+            "get":["ADMIN","HR","AUDITOR"],
+            "create":["ADMIN","HR"],
+            "update":["ADMIN","HR"],
+            "delete":["ADMIN"]
+          }
+        }
+      },
+  
+      "Role": {
+        "table": "Role",
+        "fields": [
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"roleName","type":"string","required":true,"unique":true},
+          {"name":"description","type":"string"},
+          {"name":"permissions","type":"json"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints": {"list":{"method":"GET","url":"/api/roles"},"create":{"method":"POST","url":"/api/roles"}},
+        "uiMeta": {"listColumns":["roleName","description","isActive"],"formFields":["roleName","description","permissions","isActive"], "permissions":{"list":["ADMIN"],"create":["ADMIN"]}}
+      },
+  
+      "Department": {
+        "table":"Department",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"name","type":"string","required":true},
+          {"name":"code","type":"string"},
+          {"name":"type","type":"enum","enumName":"DepartmentType"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "relations": {"doctors":"1:n -> Doctor.departmentId"},
+        "endpoints": {"list":{"method":"GET","url":"/api/departments"},"create":{"method":"POST","url":"/api/departments"}},
+        "uiMeta": {"listColumns":["publicId","name","type","isActive"],"formFields":["name","code","type","isActive"], "permissions":{"list":["ADMIN","FINANCE","HR"]}}
+      },
+  
+      "Patient": {
+        "table":"Patient",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"mrn","type":"string","unique":true},
+          {"name":"firstName","type":"string","required":true},
+          {"name":"lastName","type":"string"},
+          {"name":"gender","type":"enum","enumName":"Gender"},
+          {"name":"dateOfBirth","type":"date"},
+          {"name":"contactNumber","type":"string"},
+          {"name":"email","type":"string"},
+          {"name":"address","type":"string"},
+          {"name":"insuranceInfo","type":"json"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"deletedAt","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"},
+          {"name":"updatedAt","type":"datetime","autoUpdate":true}
+        ],
+        "relations": {
+          "appointments":"1:n -> Appointment.patientId",
+          "admissions":"1:n -> Admission.patientId",
+          "invoices":"1:n -> Invoice.patientId",
+          "prescriptions":"1:n -> Prescription.patientId"
+        },
+        "endpoints": {
+          "list":{"method":"GET","url":"/api/patients"},
+          "get":{"method":"GET","url":"/api/patients/{publicId}"},
+          "create":{"method":"POST","url":"/api/patients"},
+          "update":{"method":"PUT","url":"/api/patients/{publicId}"},
+          "admit":{"method":"POST","url":"/api/patients/{publicId}/admit"},
+          "discharge":{"method":"POST","url":"/api/patients/{publicId}/discharge"}
+        },
+        "actions":["admitPatient","dischargePatient","uploadDocument"],
+        "uiMeta": {
+          "listColumns":["publicId","mrn","firstName","lastName","contactNumber","createdAt"],
+          "detailTabs":["Profile","Appointments","Admissions","Prescriptions","Lab","Radiology","Billing","Notes"],
+          "formSections": {
+            "Basic":"firstName,lastName,gender,dateOfBirth,contactNumber",
+            "Address":"address,emergencyName,emergencyPhone",
+            "Insurance":"insuranceInfo"
+          },
+          "permissions": {
+            "create":["ADMIN","RECEPTION"],
+            "get":["ADMIN","RECEPTION","DOCTOR","NURSE","PATIENT","FINANCE"],
+            "update":["ADMIN","RECEPTION","DOCTOR","NURSE"]
+          }
+        }
+      },
+  
+      "Doctor": {
+        "table":"Doctor",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"doctorCode","type":"string","unique":true},
+          {"name":"firstName","type":"string","required":true},
+          {"name":"lastName","type":"string"},
+          {"name":"speciality","type":"string"},
+          {"name":"departmentId","type":"int"},
+          {"name":"qualifications","type":"string"},
+          {"name":"contactNumber","type":"string"},
+          {"name":"consultationFee","type":"decimal"},
+          {"name":"commissionRate","type":"decimal"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"deletedAt","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "relations":{"appointments":"1:n -> Appointment.doctorId","proceduresPerformed":"1:n -> Procedure.performedById","referralCodes":"1:n -> ReferralCode.doctorId"},
+        "endpoints":{"list":{"method":"GET","url":"/api/doctors"},"get":{"method":"GET","url":"/api/doctors/{publicId}"},"create":{"method":"POST","url":"/api/doctors"},"update":{"method":"PUT","url":"/api/doctors/{publicId}"}},
+        "uiMeta":{"listColumns":["publicId","doctorCode","firstName","lastName","speciality","departmentId"],"formFields":["doctorCode","firstName","lastName","speciality","departmentId","consultationFee","commissionRate"], "permissions":{"list":["ADMIN","RECEPTION","DOCTOR"], "get":["ADMIN","DOCTOR","RECEPTION"], "create":["ADMIN"]}}
+      },
+  
+      "Appointment": {
+        "table":"Appointment",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"appointmentNumber","type":"string","unique":true},
+          {"name":"patientId","type":"int","required":true},
+          {"name":"doctorId","type":"int"},
+          {"name":"departmentId","type":"int"},
+          {"name":"scheduledAt","type":"datetime","required":true},
+          {"name":"durationMins","type":"int"},
+          {"name":"status","type":"enum","enumName":"AppointmentStatus","default":"SCHEDULED"},
+          {"name":"reason","type":"string"},
+          {"name":"notes","type":"string"},
+          {"name":"referralCodeId","type":"int"},
+          {"name":"checkedInAt","type":"datetime"},
+          {"name":"consultedAt","type":"datetime"},
+          {"name":"isDeleted","type":"boolean","default":false},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"createdAt","type":"datetime","default":"now()"},
+          {"name":"updatedAt","type":"datetime","autoUpdate":true}
+        ],
+        "relations":{"patient":"1:1 -> Patient.patientId","doctor":"1:1 -> Doctor.doctorId"},
+        "endpoints": {
+          "list":{"method":"GET","url":"/api/appointments"},
+          "create":{"method":"POST","url":"/api/appointments"},
+          "get":{"method":"GET","url":"/api/appointments/{publicId}"},
+          "update":{"method":"PUT","url":"/api/appointments/{publicId}"},
+          "updateStatus":{"method":"PUT","url":"/api/appointments/{publicId}/status"},
+          "cancel":{"method":"POST","url":"/api/appointments/{publicId}/cancel"}
+        },
+        "actions":["checkIn","complete","reschedule","cancel"],
+        "uiMeta": {
+          "listColumns":["publicId","appointmentNumber","patientId","doctorId","scheduledAt","status"],
+          "formFields":["patientId","doctorId","departmentId","scheduledAt","durationMins","reason"],
+          "permissions": {"create":["RECEPTION","ADMIN"], "update":["RECEPTION","DOCTOR","ADMIN"], "updateStatus":["DOCTOR","RECEPTION","ADMIN"]}
+        }
+      },
+  
+      "Admission": {
+        "table":"Admission",
+        "fields":[
+          {"name":"id","type":"uuid","pk":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"patientId","type":"int","required":true},
+          {"name":"doctorId","type":"int","required":true},
+          {"name":"bedId","type":"int","required":true},
+          {"name":"admissionDate","type":"datetime","default":"now()"},
+          {"name":"admissionReason","type":"string"},
+          {"name":"status","type":"string"},
+          {"name":"dischargedAt","type":"datetime"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"deletedAt","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/admissions"},"discharge":{"method":"POST","url":"/api/admissions/{publicId}/discharge"},"list":{"method":"GET","url":"/api/admissions"}},
+        "uiMeta":{"listColumns":["publicId","patientId","doctorId","admissionDate","status"],"formFields":["patientId","doctorId","bedId","admissionReason"], "permissions":{"create":["RECEPTION","ADMIN"], "discharge":["DOCTOR","ADMIN"], "list":["ADMIN","NURSE","DOCTOR"]}}
+      },
+  
+      "Prescription": {
+        "table":"Prescription",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"prescriptionNumber","type":"string","unique":true},
+          {"name":"patientId","type":"int","required":true},
+          {"name":"doctorId","type":"int"},
+          {"name":"issuedAt","type":"datetime","default":"now()"},
+          {"name":"notes","type":"string"},
+          {"name":"referralCodeId","type":"int"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"deletedAt","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "relations":{"items":"1:n -> PrescriptionItem.prescriptionId"},
+        "endpoints":{"create":{"method":"POST","url":"/api/prescriptions"},"get":{"method":"GET","url":"/api/prescriptions/{publicId}"},"list":{"method":"GET","url":"/api/prescriptions"}},
+        "uiMeta":{"listColumns":["publicId","prescriptionNumber","patientId","doctorId","issuedAt"],"formFields":["patientId","doctorId","items","notes"], "permissions":{"create":["DOCTOR","ADMIN"],"list":["PHARMACIST","ADMIN"]}}
+      },
+  
+      "PrescriptionItem": {
+        "table":"PrescriptionItem",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"prescriptionId","type":"int","required":true},
+          {"name":"medicineId","type":"int","required":true},
+          {"name":"dosage","type":"string"},
+          {"name":"quantity","type":"int"},
+          {"name":"unitPrice","type":"decimal"},
+          {"name":"totalPrice","type":"decimal"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/prescription-items"},"delete":{"method":"DELETE","url":"/api/prescription-items/{id}"}},
+        "uiMeta":{"formFields":["medicineId","dosage","quantity","unitPrice"], "permissions":{"create":["DOCTOR","PHARMACIST"]}}
+      },
+  
+      "Medicine": {
+        "table":"Medicine",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"name","type":"string","required":true},
+          {"name":"sku","type":"string"},
+          {"name":"brand","type":"string"},
+          {"name":"unitPrice","type":"decimal"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "relations":{"stocks":"1:n -> PharmacyStock.medicineId"},
+        "endpoints":{"list":{"method":"GET","url":"/api/medicines"},"create":{"method":"POST","url":"/api/medicines"},"get":{"method":"GET","url":"/api/medicines/{publicId}"}},
+        "uiMeta":{"listColumns":["publicId","name","sku","brand","unitPrice"],"formFields":["name","sku","brand","unitPrice"], "permissions":{"list":["PHARMACIST","ADMIN"], "create":["PHARMACIST","ADMIN"]}}
+      },
+  
+      "PharmacySale": {
+        "table":"PharmacySale",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"saleNumber","type":"string","unique":true},
+          {"name":"prescriptionId","type":"int"},
+          {"name":"pharmacistId","type":"int"},
+          {"name":"totalAmount","type":"decimal"},
+          {"name":"paymentMode","type":"enum","enumName":"PaymentMode"},
+          {"name":"paymentStatus","type":"enum","enumName":"PaymentStatus"},
+          {"name":"referralCodeId","type":"int"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"deletedAt","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "relations":{"items":"1:n -> PharmacySaleItem.pharmacySaleId"},
+        "endpoints":{"create":{"method":"POST","url":"/api/pharmacy-sales"},"get":{"method":"GET","url":"/api/pharmacy-sales/{publicId}"},"list":{"method":"GET","url":"/api/pharmacy-sales"}},
+        "uiMeta":{"listColumns":["publicId","saleNumber","prescriptionId","totalAmount","paymentStatus"],"formFields":["prescriptionId","items","paymentMode","referralCodeId"], "permissions":{"create":["PHARMACIST","ADMIN"], "list":["PHARMACIST","ADMIN"]}}
+      },
+  
+      "PharmacySaleItem": {
+        "table":"PharmacySaleItem",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"pharmacySaleId","type":"int","required":true},
+          {"name":"medicineId","type":"int","required":true},
+          {"name":"quantity","type":"int"},
+          {"name":"unitPrice","type":"decimal"},
+          {"name":"totalPrice","type":"decimal"}
+        ],
+        "uiMeta":{"formFields":["medicineId","quantity","unitPrice"], "permissions":{"create":["PHARMACIST"]}}
+      },
+  
+      "LabTestTemplate": {
+        "table":"LabTestTemplate",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"code","type":"string","unique":true},
+          {"name":"name","type":"string"},
+          {"name":"departmentId","type":"int"},
+          {"name":"price","type":"decimal"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints":{"list":{"method":"GET","url":"/api/lab-templates"},"create":{"method":"POST","url":"/api/lab-templates"}},
+        "uiMeta":{"listColumns":["code","name","price"],"formFields":["code","name","price","departmentId"], "permissions":{"create":["LAB_TECH","ADMIN"], "list":["LAB_TECH","DOCTOR","ADMIN"]}}
+      },
+  
+      "LabRequest": {
+        "table":"LabRequest",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"requestNumber","type":"string","unique":true},
+          {"name":"patientId","type":"int","required":true},
+          {"name":"doctorId","type":"int"},
+          {"name":"templateId","type":"int","required":true},
+          {"name":"referralCodeId","type":"int"},
+          {"name":"status","type":"enum","enumName":"TestStatus","default":"REQUESTED"},
+          {"name":"requestedAt","type":"datetime","default":"now()"},
+          {"name":"completedAt","type":"datetime"},
+          {"name":"resultFileUrl","type":"string"},
+          {"name":"resultSummary","type":"string"},
+          {"name":"price","type":"decimal","default":"0.00"},
+          {"name":"paymentStatus","type":"enum","enumName":"PaymentStatus","default":"PENDING"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"deletedAt","type":"datetime"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/lab-requests"},"list":{"method":"GET","url":"/api/lab-requests"},"updateStatus":{"method":"PUT","url":"/api/lab-requests/{id}/status"},"uploadResult":{"method":"POST","url":"/api/lab-requests/{id}/result"}},
+        "uiMeta":{"listColumns":["requestNumber","patientId","templateId","status","paymentStatus"],"formFields":["patientId","templateId","doctorId","referralCodeId","notes"], "permissions":{"create":["DOCTOR","RECEPTION"], "updateStatus":["LAB_TECH","ADMIN"], "list":["LAB_TECH","DOCTOR","ADMIN"]}}
+      },
+  
+      "RadiologyTemplate": {
+        "table":"RadiologyTemplate",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"code","type":"string","unique":true},
+          {"name":"name","type":"string"},
+          {"name":"departmentId","type":"int"},
+          {"name":"price","type":"decimal"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "uiMeta":{"listColumns":["code","name","price"],"formFields":["code","name","price","departmentId"], "permissions":{"create":["RADIOLOGIST","ADMIN"], "list":["RADIOLOGIST","DOCTOR","ADMIN"]}},
+        "endpoints":{"list":{"method":"GET","url":"/api/radio-templates"},"create":{"method":"POST","url":"/api/radio-templates"}}
+      },
+  
+      "RadiologyRequest": {
+        "table":"RadiologyRequest",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"requestNumber","type":"string","unique":true},
+          {"name":"patientId","type":"int","required":true},
+          {"name":"doctorId","type":"int"},
+          {"name":"templateId","type":"int","required":true},
+          {"name":"referralCodeId","type":"int"},
+          {"name":"status","type":"enum","enumName":"TestStatus","default":"REQUESTED"},
+          {"name":"requestedAt","type":"datetime","default":"now()"},
+          {"name":"completedAt","type":"datetime"},
+          {"name":"reportUrl","type":"string"},
+          {"name":"findings","type":"string"},
+          {"name":"price","type":"decimal","default":"0.00"},
+          {"name":"paymentStatus","type":"enum","enumName":"PaymentStatus","default":"PENDING"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"deletedAt","type":"datetime"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/radio-requests"},"updateStatus":{"method":"PUT","url":"/api/radio-requests/{id}/status"},"uploadReport":{"method":"POST","url":"/api/radio-requests/{id}/report"},"list":{"method":"GET","url":"/api/radio-requests"}},
+        "uiMeta":{"listColumns":["requestNumber","patientId","templateId","status","paymentStatus"],"formFields":["patientId","templateId","doctorId","referralCodeId"], "permissions":{"create":["DOCTOR","RECEPTION"], "updateStatus":["RADIOLOGIST","ADMIN"], "list":["RADIOLOGIST","DOCTOR","ADMIN"]}}
+      },
+  
+      "Procedure": {
+        "table":"Procedure",
+        "description":"Procedures performed by doctors (replaces separate Surgery module). Billable and team-managed.",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"procedureNumber","type":"string","unique":true},
+          {"name":"patientId","type":"int","required":true},
+          {"name":"performedById","type":"int"},
+          {"name":"procedureType","type":"string"},
+          {"name":"scheduledAt","type":"datetime"},
+          {"name":"status","type":"string"},
+          {"name":"operatingRoom","type":"string"},
+          {"name":"referralCodeId","type":"int"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"deletedAt","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "relations":{"team":"1:n -> ProcedureTeam.procedureId"},
+        "endpoints":{"create":{"method":"POST","url":"/api/procedures"},"list":{"method":"GET","url":"/api/procedures"},"updateStatus":{"method":"PUT","url":"/api/procedures/{id}/status"}},
+        "uiMeta":{"listColumns":["publicId","procedureNumber","patientId","performedById","scheduledAt","status"],"formFields":["patientId","performedById","procedureType","scheduledAt","team","notes"], "permissions":{"create":["DOCTOR","ADMIN"], "updateStatus":["DOCTOR","ADMIN"], "list":["ADMIN","DOCTOR"]}}
+      },
+  
+      "ProcedureTeam": {
+        "table":"ProcedureTeam",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"procedureId","type":"int","required":true},
+          {"name":"memberId","type":"int","required":true},
+          {"name":"memberRole","type":"string"}
+        ],
+        "uiMeta":{"formFields":["procedureId","memberId","memberRole"], "permissions":{"create":["DOCTOR","ADMIN"], "list":["ADMIN","DOCTOR"]}}
+      },
+  
+      "Invoice": {
+        "table":"Invoice",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"invoiceNumber","type":"string","unique":true},
+          {"name":"invoiceType","type":"enum","enumName":"InvoiceType"},
+          {"name":"appointmentId","type":"int"},
+          {"name":"procedureId","type":"int"},
+          {"name":"patientId","type":"int","required":true},
+          {"name":"totalAmount","type":"decimal"},
+          {"name":"paidAmount","type":"decimal"},
+          {"name":"paymentMode","type":"enum","enumName":"PaymentMode"},
+          {"name":"paymentStatus","type":"enum","enumName":"PaymentStatus"},
+          {"name":"issuedAt","type":"datetime","default":"now()"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"deletedAt","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "relations":{"items":"1:n -> InvoiceItem.invoiceId"},
+        "endpoints":{"create":{"method":"POST","url":"/api/invoices"},"get":{"method":"GET","url":"/api/invoices/{publicId}"},"applyPayment":{"method":"POST","url":"/api/invoices/{publicId}/payments"},"list":{"method":"GET","url":"/api/invoices"}},
+        "uiMeta":{"listColumns":["publicId","invoiceNumber","invoiceType","patientId","totalAmount","paidAmount","paymentStatus"],"formFields":["invoiceType","appointmentId","procedureId","items","totalAmount"], "permissions":{"create":["FINANCE","ADMIN"], "applyPayment":["FINANCE","ADMIN"], "get":["FINANCE","ADMIN","PATIENT"]}}
+      },
+  
+      "InvoiceItem": {
+        "table":"InvoiceItem",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"invoiceId","type":"int","required":true},
+          {"name":"description","type":"string"},
+          {"name":"quantity","type":"int","default":1},
+          {"name":"unitPrice","type":"decimal"},
+          {"name":"total","type":"decimal"}
+        ],
+        "uiMeta":{"formFields":["description","quantity","unitPrice","total"], "permissions":{"create":["FINANCE","ADMIN"], "update":["FINANCE"]}}
+      },
+  
+      "Payment": {
+        "table":"Payment",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"invoiceId","type":"int","required":true},
+          {"name":"amount","type":"decimal"},
+          {"name":"paymentMode","type":"enum","enumName":"PaymentMode"},
+          {"name":"paymentRef","type":"string"},
+          {"name":"paidAt","type":"datetime","default":"now()"},
+          {"name":"status","type":"enum","enumName":"PaymentStatus","default":"PAID"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/payments"},"list":{"method":"GET","url":"/api/payments"}},
+        "uiMeta":{"formFields":["invoiceId","amount","paymentMode","paymentRef"], "permissions":{"create":["FINANCE","ADMIN"], "list":["FINANCE","ADMIN"]}}
+      },
+  
+      "ReferralCode": {
+        "table":"ReferralCode",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"publicId","type":"uuid","unique":true},
+          {"name":"doctorId","type":"int","required":true},
+          {"name":"code","type":"string","unique":true},
+          {"name":"description","type":"string"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"validFrom","type":"datetime"},
+          {"name":"validTo","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/referral-codes"},"deactivate":{"method":"POST","url":"/api/referral-codes/{id}/deactivate"},"list":{"method":"GET","url":"/api/referral-codes"}},
+        "uiMeta":{"listColumns":["publicId","code","doctorId","isActive"],"formFields":["doctorId","code","description","validFrom","validTo","isActive"], "permissions":{"create":["ADMIN"], "list":["ADMIN","FINANCE"]}}
+      },
+  
+      "CommissionSetup": {
+        "table":"CommissionSetup",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"createdById","type":"int"},
+          {"name":"doctorId","type":"int"},
+          {"name":"departmentId","type":"int"},
+          {"name":"source","type":"enum","enumName":"SourceType"},
+          {"name":"commissionType","type":"enum","enumName":"CommissionType"},
+          {"name":"value","type":"decimal"},
+          {"name":"isActive","type":"boolean","default":true},
+          {"name":"validFrom","type":"datetime"},
+          {"name":"validTo","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/commission-setup"},"list":{"method":"GET","url":"/api/commission-setup"}},
+        "uiMeta":{"formFields":["doctorId","source","commissionType","value","validFrom","validTo"], "permissions":{"create":["FINANCE","ADMIN"], "list":["FINANCE","ADMIN"]}}
+      },
+  
+      "CommissionTransaction": {
+        "table":"CommissionTransaction",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"referralCodeId","type":"int"},
+          {"name":"doctorId","type":"int","required":true},
+          {"name":"departmentId","type":"int"},
+          {"name":"sourceType","type":"enum","enumName":"SourceType"},
+          {"name":"sourceId","type":"int"},
+          {"name":"invoiceId","type":"int"},
+          {"name":"amount","type":"decimal"},
+          {"name":"percentage","type":"decimal"},
+          {"name":"commissionType","type":"enum","enumName":"CommissionType"},
+          {"name":"status","type":"enum","enumName":"CommissionStatus","default":"PENDING"},
+          {"name":"createdAt","type":"datetime","default":"now()"},
+          {"name":"paidAt","type":"datetime"}
+        ],
+        "endpoints":{"list":{"method":"GET","url":"/api/commission-transactions"},"markPaid":{"method":"POST","url":"/api/commission-transactions/{id}/pay"}},
+        "uiMeta":{"listColumns":["id","doctorId","amount","status","sourceType"], "permissions":{"list":["FINANCE","ADMIN"], "markPaid":["FINANCE","ADMIN"]}}
+      },
+  
+      "InsuranceClaim": {
+        "table":"InsuranceClaim",
+        "fields":[
+          {"name":"id","type":"uuid","pk":true},
+          {"name":"claimNumber","type":"string","unique":true},
+          {"name":"invoiceId","type":"int"},
+          {"name":"patientId","type":"int"},
+          {"name":"insuranceProvider","type":"string"},
+          {"name":"policyNumber","type":"string"},
+          {"name":"claimAmount","type":"decimal"},
+          {"name":"approvedAmount","type":"decimal"},
+          {"name":"submissionDate","type":"datetime"},
+          {"name":"approvalDate","type":"datetime"},
+          {"name":"status","type":"string"},
+          {"name":"documents","type":"json"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/insurance-claims"},"list":{"method":"GET","url":"/api/insurance-claims"},"updateStatus":{"method":"PUT","url":"/api/insurance-claims/{id}/status"}},
+        "uiMeta":{"formFields":["invoiceId","patientId","insuranceProvider","policyNumber","claimAmount","documents"], "permissions":{"create":["FINANCE"], "updateStatus":["FINANCE","ADMIN"], "list":["FINANCE","ADMIN"]}}
+      },
+  
+      "StaffAttendance": {
+        "table":"StaffAttendance",
+        "fields":[
+          {"name":"id","type":"uuid","pk":true},
+          {"name":"staffId","type":"int"},
+          {"name":"date","type":"date"},
+          {"name":"shiftType","type":"enum","enumName":"ShiftType"},
+          {"name":"status","type":"enum","enumName":"AttendanceStatus"},
+          {"name":"checkInTime","type":"datetime"},
+          {"name":"checkOutTime","type":"datetime"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/staff-attendance"},"list":{"method":"GET","url":"/api/staff-attendance"}},
+        "uiMeta":{"formFields":["staffId","date","shiftType","status","checkInTime","checkOutTime"], "permissions":{"create":["HR","ADMIN"], "list":["HR","ADMIN"]}}
+      },
+  
+      "Vital": {
+        "table":"Vital",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"patientId","type":"int","required":true},
+          {"name":"recordedById","type":"int"},
+          {"name":"temperature","type":"float"},
+          {"name":"pulse","type":"float"},
+          {"name":"bloodPressureSystolic","type":"float"},
+          {"name":"bloodPressureDiastolic","type":"float"},
+          {"name":"respiratoryRate","type":"float"},
+          {"name":"spo2","type":"float"},
+          {"name":"weight","type":"float"},
+          {"name":"height","type":"float"},
+          {"name":"bmi","type":"float"},
+          {"name":"remarks","type":"string"},
+          {"name":"recordedAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/vitals"},"list":{"method":"GET","url":"/api/vitals?patientId={patientId}"}},
+        "uiMeta":{"formFields":["patientId","temperature","pulse","bloodPressureSystolic","bloodPressureDiastolic","spo2","weight","height","remarks"], "permissions":{"create":["NURSE","DOCTOR"], "list":["DOCTOR","NURSE","ADMIN","PATIENT"]}}
+      },
+  
+      "Notification": {
+        "table":"Notification",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"patientId","type":"int"},
+          {"name":"userId","type":"int"},
+          {"name":"message","type":"string"},
+          {"name":"status","type":"string","default":"UNREAD"},
+          {"name":"type","type":"string"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/notifications"},"list":{"method":"GET","url":"/api/notifications?userId={userId}"},"markRead":{"method":"POST","url":"/api/notifications/{id}/read"}},
+        "uiMeta":{"listColumns":["id","message","status","createdAt"], "permissions":{"create":["ADMIN","DOCTOR","RECEPTION"], "list":["PATIENT","DOCTOR","ADMIN"], "markRead":["PATIENT","DOCTOR","ADMIN"]}}
+      },
+  
+      "Feedback": {
+        "table":"Feedback",
+        "fields":[
+          {"name":"id","type":"int","pk":true,"autoIncrement":true},
+          {"name":"patientId","type":"int"},
+          {"name":"departmentId","type":"int"},
+          {"name":"rating","type":"int"},
+          {"name":"comments","type":"string"},
+          {"name":"createdAt","type":"datetime","default":"now()"}
+        ],
+        "endpoints":{"create":{"method":"POST","url":"/api/feedback"},"list":{"method":"GET","url":"/api/feedback"}},
+        "uiMeta":{"formFields":["patientId","departmentId","rating","comments"], "permissions":{"create":["PATIENT"], "list":["ADMIN","DEPARTMENT_HEAD"]}}
+      }
+    },
+    "dashboards": {
+      "defaultRedirect": {
+        "afterLogin": {
+          "roleMap": {
+            "ADMIN": "/dashboards/admin",
+            "DOCTOR": "/dashboards/doctor",
+            "NURSE": "/dashboards/nurse",
+            "PHARMACIST": "/dashboards/pharmacy",
+            "LAB_TECH": "/dashboards/lab",
+            "RADIOLOGIST": "/dashboards/radiology",
+            "FINANCE": "/dashboards/finance",
+            "HR": "/dashboards/hr",
+            "PATIENT": "/dashboards/patient",
+            "RECEPTION": "/dashboards/reception",
+            "AUDITOR": "/dashboards/audit"
+          },
+          "fallback": "/dashboards/landing"
+        }
+      },
+      "definitions": {
+        "admin": {
+          "route": "/dashboards/admin",
+          "title": "System Admin Dashboard",
+          "widgets": [
+            {"type":"kpi","id":"totalPatients","label":"Total Patients","data":"GET /api/patients/count"},
+            {"type":"kpi","id":"todayAppointments","label":"Today's Appointments","data":"GET /api/appointments?date=today&count"},
+            {"type":"table","id":"recentInvoices","label":"Recent Invoices","data":"GET /api/invoices?limit=10"}
+          ],
+          "menus": ["Users","Departments","Doctors","Billing","Reports","Settings"]
+        },
+        "doctor": {
+          "route": "/dashboards/doctor",
+          "title": "Doctor Dashboard",
+          "widgets": [
+            {"type":"kpi","id":"myTodayAppointments","label":"My Appointments Today","data":"GET /api/appointments?doctorId={user.doctorId}&date=today"},
+            {"type":"list","id":"pendingLabResults","label":"Pending Lab Results","data":"GET /api/lab-requests?doctorId={user.doctorId}&status=IN_PROCESS"},
+            {"type":"quickActions","id":"actions","actions":[
+              {"label":"Create Prescription","route":"/prescriptions/new"},
+              {"label":"Start Consultation","route":"/consultations/start"}
+            ]}
+          ],
+          "menus":["Appointments","Patients","Prescriptions","Procedures","Lab Requests"]
+        },
+        "nurse": {
+          "route": "/dashboards/nurse",
+          "title": "Nurse Dashboard",
+          "widgets":[
+            {"type":"kpi","id":"patientsOnWard","label":"Patients On Ward","data":"GET /api/admissions?status=ADMITTED&count"},
+            {"type":"list","id":"medAdmin","label":"Medications to Administer","data":"GET /api/medication-logs?shift=today"}
+          ],
+          "menus":["Admissions","Medication Administration","Vitals","Housekeeping"]
+        },
+        "pharmacy": {
+          "route": "/dashboards/pharmacy",
+          "title":"Pharmacy Dashboard",
+          "widgets":[
+            {"type":"kpi","id":"lowStock","label":"Low Stock Medicines","data":"GET /api/medicines?filter=lowStock"},
+            {"type":"list","id":"pendingSales","label":"Pending Sales","data":"GET /api/pharmacy-sales?paymentStatus=PENDING"}
+          ],
+          "menus":["Medicines","Sales","Purchase Orders","Stock"]
+        },
+        "lab": {
+          "route": "/dashboards/lab",
+          "title":"Lab Dashboard",
+          "widgets":[
+            {"type":"list","id":"todayRequests","label":"Today's Lab Requests","data":"GET /api/lab-requests?date=today"},
+            {"type":"kpi","id":"avgTurnaround","label":"Avg Turnaround (hrs)","data":"GET /api/reports/avg-lab-turnaround"}
+          ],
+          "menus":["Requests","Templates","Results"]
+        },
+        "radiology": {
+          "route": "/dashboards/radiology",
+          "title":"Radiology Dashboard",
+          "widgets":[
+            {"type":"list","id":"pendingScans","label":"Pending Scans","data":"GET /api/radio-requests?status=REQUESTED"}
+          ],
+          "menus":["Requests","Templates","Reports"]
+        },
+        "finance": {
+          "route": "/dashboards/finance",
+          "title":"Finance Dashboard",
+          "widgets":[
+            {"type":"kpi","id":"outstandingInvoices","label":"Outstanding Invoices","data":"GET /api/invoices?paymentStatus=PENDING&count"},
+            {"type":"chart","id":"revenueTrend","label":"Revenue Trend","data":"GET /api/reports/revenue-trend"}
+          ],
+          "menus":["Invoices","Payments","Claims","Reports"]
+        },
+        "hr": {
+          "route": "/dashboards/hr",
+          "title":"HR Dashboard",
+          "widgets":[
+            {"type":"list","id":"todayAttendance","label":"Today's Attendance","data":"GET /api/staff-attendance?date=today"},
+            {"type":"kpi","id":"totalStaff","label":"Total Staff","data":"GET /api/users?role=STAFF&count"}
+          ],
+          "menus":["Attendance","Payroll","Staff"]
+        },
+        "patient": {
+          "route": "/dashboards/patient",
+          "title":"Patient Portal",
+          "widgets":[
+            {"type":"list","id":"myAppointments","label":"My Appointments","data":"GET /api/appointments?patientId={user.patientId}"},
+            {"type":"list","id":"myInvoices","label":"My Bills","data":"GET /api/invoices?patientId={user.patientId}"}
+          ],
+          "menus":["My Profile","Appointments","Prescriptions","Lab Reports","Invoices","Feedback"]
+        },
+        "reception": {
+          "route": "/dashboards/reception",
+          "title":"Reception Dashboard",
+          "widgets":[
+            {"type":"list","id":"todayAppointments","label":"Today's Appointments","data":"GET /api/appointments?date=today"},
+            {"type":"quickActions","id":"newPatient","label":"Register Patient","action":"/patients/new"}
+          ],
+          "menus":["Patients","Appointments","Admissions"]
+        },
+        "audit": {
+          "route": "/dashboards/audit",
+          "title":"Audit Dashboard",
+          "widgets":[
+            {"type":"list","id":"auditLogs","label":"Recent Audit Logs","data":"GET /api/audit-logs?limit=100"},
+            {"type":"kpi","id":"suspiciousCommissions","label":"Suspicious Commission Patterns","data":"GET /api/reports/suspicious-commissions"}
+          ],
+          "menus":["Audit Logs","Reports"]
+        }
+      }
+    },
+    "frontendHints": {
+      "framework": "react",
+      "preferredUI": "tailwind + shadcn",
+      "listPaginationDefault": 20,
+      "dateFormat": "yyyy-MM-dd HH:mm",
+      "decimalFormat": "2",
+      "relationWidgets": {
+        "patientSelect": {"widget":"autocomplete","endpoint":"/api/patients?search={q}"},
+        "doctorSelect": {"widget":"autocomplete","endpoint":"/api/doctors?search={q}"},
+        "medicineSelect": {"widget":"autocomplete","endpoint":"/api/medicines?search={q}"}
+      },
+      "formGeneration": {
+        "useSections": true,
+        "autoValidate": true,
+        "useFormik": true
+      },
+      "securityNotes": [
+        "Use backend RBAC — do not rely solely on frontend role checks.",
+        "Filter patient-scoped endpoints server-side (patientId must match authenticated patient).",
+        "Secure file uploads (lab/radiology reports) with signed S3 URLs."
+      ]
+    },
+    "generatorHints": {
+      "prismaMapping": "Field types map 1:1 to prisma schema. Decimal => Decimal(14,2). UUID fields map to prisma String @id or @unique with uuid().",
+      "migrationChecklist": [
+        "Run migrations on staging and test role-redirect flows.",
+        "Seed minimal data (1 admin, 1 doctor, 1 patient) for UI smoke tests.",
+        "Add DB indexes for appointments(doctorId, scheduledAt) and invoices(patientId, paymentStatus)."
+      ]
+    }
+  }
+  

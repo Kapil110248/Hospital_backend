@@ -1,12 +1,22 @@
-generator client {
-  provider = "prisma-client-js"
-}
+// schema.prisma
+// HMS Pro - production-hardened: decimal precision, publicId, soft-delete, onDelete rules, indexes
+
+// **************************************************************************************
+// ✅ UPDATE: Centralization of Common Fields (User Model as Single Source of Truth)
+// Saare common fields (firstName, lastName, gender, dateOfBirth, phone, address)
+// ko User model mein move kar diya gaya hai.
+// Specialized models (Doctor, Patient, Nurse, Pharmacist) se yeh fields hata diye gaye hain.
+// Staff models (Doctor, Nurse, Pharmacist) mein userId ko mandatory One-to-One rakha gaya hai.
+// **************************************************************************************
 
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
+generator client {
+  provider = "prisma-client-js"
+}
 
 /// --------------------
 /// Enums
@@ -18,18 +28,17 @@ enum Gender {
   UNKNOWN
 }
 
-enum RoleType {
-  SYSTEM_ADMIN
+enum UserRole {
+  ADMIN
   DOCTOR
   NURSE
-  RECEPTIONIST
   PHARMACIST
   LAB_TECH
   RADIOLOGIST
-  ACCOUNTANT
-  AUDITOR
+  FINANCE
+  HR
   PATIENT
-  OTHER
+  AUDITOR
 }
 
 enum AppointmentStatus {
@@ -76,20 +85,12 @@ enum ResultStatus {
   NOT_REPORTED
 }
 
-enum SurgeryStatus {
-  SCHEDULED
-  ONGOING
-  COMPLETED
-  CANCELLED
-  POSTPONED
-}
-
 enum InvoiceType {
   CONSULTATION
   LAB
   RADIOLOGY
   PHARMACY
-  SURGERY
+  PROCEDURE
   ADMISSION
   OTHER
 }
@@ -117,13 +118,13 @@ enum SourceType {
   PHARMACY
   LAB
   RADIOLOGY
-  SURGERY
+  PROCEDURE
   BLOOD_BANK
   CONSULTATION
   OTHER
 }
 
-enum BloodType {
+enum BloodType  {
   A_POS
   A_NEG
   B_POS
@@ -132,192 +133,374 @@ enum BloodType {
   AB_NEG
   O_POS
   O_NEG
-  UNKNOWN 
+  UNKNOWN
+}
+
+enum ShiftType {
+  DAY
+  NIGHT
+}
+
+enum DutyShiftType {
+  STRAIGHT
+  BREAK_SHIFT
+  ROTATIONAL
+}
+
+enum DayOfWeek {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+enum DutyStatus {
+  SCHEDULED
+  ON_LEAVE
+  OFF_DUTY
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  ON_LEAVE
+}
+
+enum FollowUpPurpose {
+  REVIEW
+  LAB_RESULT
+  PROCEDURE
+  FOLLOW_CHECKUP
+}
+
+enum FollowUpStatus {
+  SCHEDULED
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+
+enum InsuranceClaimStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SETTLED
+}
+
+enum RefundMode {
+  CASH
+  CARD
+  UPI
+  BANK_TRANSFER
+  CHEQUE
+}
+
+enum RefundReason {
+  CANCELLED_APPOINTMENT
+  BILLING_ERROR
+  RETURNED_MEDICINE
+  INSURANCE_ADJUSTMENT
+  OTHER
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum AdmissionStatus {
+  ADMITTED
+  DISCHARGED
+}
+
+enum TaskType {
+  CLEANING
+  MAINTENANCE
+  WASTE_DISPOSAL
+  SANITIZATION
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum HousekeepingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+}
+
+enum PatientStatus {
+  OPD
+  IPD
+  EMERGENCY
+  DISCHARGE
+  CANCELLED
 }
 
 /// --------------------
 /// Core System Models
 /// --------------------
 
-// Authentication and basic user record
+// === CENTRAL USER MODEL (LOGIN & COMMON FIELDS) ===
 model User {
-  id           Int       @id @default(autoincrement())
-  email        String    @unique
-  password     String
-  role         RoleType
-  displayName  String?
-  phone        String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  createdById  Int?
-  // administrative user who created this
-  updatedById  Int?
+  id                   Int          @id @default(autoincrement())
+  publicId             String       @unique @default(uuid())
+  email                String       @unique
+  password             String
+  role                 UserRole
+  firstName            String?      // Now centralized
+  lastName             String?      // Now centralized
+  displayName          String?
+  gender               Gender       @default(UNKNOWN) // Now centralized
+  dateOfBirth          DateTime?    // Now centralized
+  phone                String?      @unique // Now centralized and unique
+  address              String?      // Now centralized
 
-  // Relations
-  createdBy    User? @relation("UserCreatedBy", fields: [createdById], references: [id])
-  updatedBy    User? @relation("UserUpdatedBy", fields: [updatedById], references: [id])
-  doctor       Doctor? 
-  patient      Patient?
-  nurse        Nurse?
-  pharmacist   Pharmacist?
-  auditLogs    AuditLog[]
+  // AUDIT AND STATUS FIELDS
+  isActive             Boolean      @default(true)
+  deletedAt            DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  createdById          Int?
+  updatedById          Int?
 
-  // FIXES: Missing back-relations for User
-  createdUsers User[]    @relation("UserCreatedBy")
-  updatedUsers User[]    @relation("UserUpdatedBy")
-  medicalRecords MedicalRecord[] 
-  commissionPayouts CommissionPayout[] 
-  bloodRequests BloodRequest[] 
-  commissionSetups CommissionSetup[]
-  vitalsRecorded Vitals[] @relation("UserRecordedVitals")
+  // SELF-RELATIONS AND SPECIALIZED RELATIONS
+  createdBy            User?        @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy            User?        @relation("UserUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdUsers         User[]       @relation("UserCreatedBy")
+  updatedUsers         User[]       @relation("UserUpdatedBy")
+
+  // ONE-TO-ONE RELATIONS TO SPECIALIZED MODELS (for staff/patient data)
+  doctor               Doctor?
+  patient              Patient?
+  nurse                Nurse?
+  pharmacist           Pharmacist?
   
-  // FIX: Relation field for FollowUp
-  followUps      FollowUp[] @relation("FollowUpDoctor")
-  
-  // FIX: New back-relation for StaffAttendance
-  staffAttendanceRecords StaffAttendance[] @relation("StaffAttendanceUser")
+  // OTHER RELATIONS
+  medicalRecords       MedicalRecord[] @relation("MedicalRecordCreator")
+  commissionPayouts    CommissionPayout[] @relation("CommissionPayoutCreator")
+  commissionSetupsCreated CommissionSetup[] @relation("CommissionSetupCreator")
+  insuranceClaimsProcessed InsuranceClaim[] @relation("ClaimProcessedBy")
+  refundsProcessed     Refund[] @relation("RefundProcessedBy")
+  dutyRostersCreated   DutyRoster[] @relation("DutyRosterCreator")
+  dutyAssignments      DutyAssignment[]
+  housekeepingVerified HousekeepingTask[] @relation("HousekeepingVerifier")
+  bloodRequestsRequested BloodRequest[] @relation("BloodRequestRequester")
+  auditLogs            AuditLog[]
+  attendances          StaffAttendance[]
+  labResults           LabResult[]       @relation("user_lab_results")
+  pharmacySales        PharmacySale[]   @relation("user_pharmacy_sales")
+
+  @@index([role])
 }
 
-/// Basic audit log for operations (referral/commission important)
+
 model AuditLog {
   id          Int     @id @default(autoincrement())
   entity      String
   entityId    Int?
   action      String
   description String?
-  performedBy Int?     // User.id
+  performedBy Int?
   metadata    Json?
   ipAddress   String?
   createdAt   DateTime @default(now())
 
-  performedByUser User? @relation(fields: [performedBy], references: [id])
+  performedByUser User? @relation(fields: [performedBy], references: [id], onDelete: SetNull)
+  @@index([entity, entityId])
 }
 
-/// Departments (clinical, support, finance etc)
-model Department {
-  id          Int            @id @default(autoincrement())
-  name        String
-  code        String? @unique
-  description String?
-  type        DepartmentType @default(CLINICAL)
-  isActive    Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+// Role Model for DutyAssignment
+model Role {
+  id           Int      @id @default(autoincrement())
+  publicId     String   @unique @default(uuid())
+  name         String   @unique
+  description  String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  doctors     Doctor[]
-  rooms       Room[]
+  dutyAssignments DutyAssignment[]
+
+  @@map("roles")
+  @@index([name])
+}
+
+model Department {
+  id           Int            @id @default(autoincrement())
+  publicId     String         @unique @default(uuid())
+  name         String
+  code         String?        @unique
+  description  String?
+  type         DepartmentType @default(CLINICAL)
+  isActive     Boolean        @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  // FIX: Added back-relations
+  doctors      Doctor[]
+  rooms        Room[]
   labTemplates LabTestTemplate[]
   radioTemplates RadiologyTemplate[]
-  expenses    Expense[]
-  
-  // FIXES: Missing back-relations
-  appointments Appointment[] 
-  commissionSetups CommissionSetup[] 
+  expenses     Expense[]
+  dutyRosters  DutyRoster[]
+  appointments Appointment[]
+  commissionSetups CommissionSetup[]
+  commissionTransactions CommissionTransaction[]
   departmentRevenues DepartmentRevenue[]
-
   @@index([name])
 }
 
 /// --------------------
-/// People: 
-/// Patients & Staff
+/// People: Patients & Staff
 /// --------------------
 
 model Patient {
-  id             Int       @id @default(autoincrement())
-  userId         Int? @unique
-  mrn            String? @unique // medical record number
-  firstName      String
-  lastName       String
-  gender         Gender?
-  dateOfBirth    DateTime?
-  contactNumber  String?
-  email          String?
-  address        String?
-  emergencyName  String?
-  emergencyPhone String?
-  insuranceInfo  Json?
-  isActive       Boolean   @default(true)
-  isDeleted      Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                Int         @id @default(autoincrement())
+  publicId          String      @unique @default(uuid())
+  userId            Int?        @unique // Relation to User model
+  user              User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  user           User? @relation(fields: [userId], references: [id])
-  appointments   Appointment[]
-  medicalRecords MedicalRecord[]
-  invoices       Invoice[]
-  prescriptions  Prescription[]
-  admissions     Admission[]
-  labRequests    LabRequest[]
+  mrn               String?     @unique // Medical Record Number
+  fatherName        String
+  nationalId        String?     @unique
+  bloodGroup        BloodType
+  allergies         String?
+  medicalHistory    String?
+  currentTreatment  String?
+  height            Float?
+  weight            Float?
+
+  // 🚨 Emergency & Insurance
+  emergencyName     String?
+  emergencyPhone    String?
+  insuranceInfo     Json?
+  insuranceProvider String?
+  policyNumber      String?
+
+  // 📋 Status & Audit
+  status            PatientStatus?   @default(OPD)
+  isActive          Boolean          @default(true)
+  deletedAt         DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  // 🔗 Relations with other modules
+  appointments      Appointment[]
+  medicalRecords    MedicalRecord[]
+  invoices          Invoice[]
+  prescriptions     Prescription[]
+  admissions        Admission[]
+  labRequests       LabRequest[]
   radiologyRequests RadiologyRequest[]
-  surgeries      Surgery[]
-  medicationLogs MedicationLog[]
-  nurseNotes     NurseNote[]
-  bloodRequests  BloodRequest[]
-  vitals         Vitals[]
-  
-  followUps      FollowUp[]
+  procedures        Procedure[]
+  medicationLogs    MedicationLog[]
+  nurseNotes        NurseNote[]
+  bloodRequests     BloodRequest[]
+  vitals            Vital[]
+  followUps         FollowUp[]
+  insuranceClaims   InsuranceClaim[]
+  refunds           Refund[]
 
-  @@index([lastName, firstName])
+  // Indexes for faster query
+  @@index([publicId])
+  @@index([status])
+  @@index([nationalId])
 }
 
+// ✅ UPDATED: Common fields (name, contact) removed. userId made mandatory.
 model Doctor {
-  id            Int      @id @default(autoincrement())
-  userId        Int? @unique
-  doctorCode    String   @unique // internal doctor code (not referral)
-  referralCodeId Int?
-  firstName     String
-  lastName      String
-  speciality    String?
-  departmentId  Int?
-  qualifications String?
-  contactNumber String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                    Int      @id @default(autoincrement())
+  publicId              String   @unique @default(uuid())
+  userId                Int      @unique // One-to-One: MANDATORY (Staff must have a User account)
+  doctorCode            String   @unique
+  referralCodeId        Int?
+  speciality            String?
+  departmentId          Int?
+  qualifications        String?
+  isActive              Boolean  @default(true)
+  deletedAt             DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  user          User? @relation(fields: [userId], references: [id])
-  department    Department? @relation(fields: [departmentId], references: [id])
-  appointments  Appointment[]
-  prescriptions Prescription[]
-  labRequests   LabRequest[] 
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department            Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  appointments          Appointment[]
+  prescriptions         Prescription[]
+  labRequests           LabRequest[] @relation("DoctorLabRequests")
   radiologyRequests RadiologyRequest[]
-  surgeryMembers SurgeryDoctor[]
-  commissions   CommissionSetup[]        // setups created for this doctor
-  referralCodes ReferralCode[]           // all referral codes generated
-  earnings      DoctorEarning[]
+  commissions           CommissionSetup[]
+  referralCodes         ReferralCode[]
+  earnings              DoctorEarning[]
   commissionTransactions CommissionTransaction[]
+  proceduresPerformed Procedure[]
+  procedureTeams      ProcedureTeam[]
+  recordedVitals        Vital[]
+  admissions            Admission[]
+  followUps             FollowUp[] @relation("DoctorFollowUps")
+  bloodRequests         BloodRequest[]
 
-  admissions    Admission[]
-  bloodRequests BloodRequest[]
-
-  @@index([lastName, firstName, doctorCode])
+  @@index([doctorCode])
+  @@index([publicId])
 }
 
+// ✅ UPDATED: Common fields (name, contact) removed. userId made mandatory.
 model Nurse {
-  id            Int     @id @default(autoincrement())
-  userId        Int? @unique
-  firstName     String
-  lastName      String
-  ward          String?
-  contact       String?
-  createdAt     DateTime @default(now())
+  id         Int     @id @default(autoincrement())
+  publicId   String  @unique @default(uuid())
+  userId     Int     @unique // One-to-One: MANDATORY
+  ward       String? // Nurse-specific
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  user          User? @relation(fields: [userId], references: [id])
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   medicationLogs MedicationLog[]
-  nurseNotes    NurseNote[]
+  nurseNotes NurseNote[]
 }
 
+// ✅ UPDATED: Common fields (name) removed. userId made mandatory.
 model Pharmacist {
   id        Int     @id @default(autoincrement())
-  userId    Int? @unique
-  firstName String
-  lastName  String
+  publicId  String  @unique @default(uuid())
+  userId    Int     @unique // One-to-One: MANDATORY
   createdAt DateTime @default(now())
 
-  user      User? @relation(fields: [userId], references: [id])
-  sales     PharmacySale[]
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sales     PharmacySale[] @relation("PharmacistSales")
+}
+
+/// --------------------
+/// Staff Attendance
+/// --------------------
+model StaffAttendance {
+  id          String           @id @default(uuid())
+  staffId     Int
+  date        DateTime
+  shiftType   ShiftType
+  status      AttendanceStatus @default(PRESENT)
+  checkInTime DateTime?
+  checkOutTime DateTime?
+  remarks     String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  staff       User             @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  housekeepingTasks HousekeepingTask[]
+
+  @@index([staffId, date])
 }
 
 /// --------------------
@@ -325,52 +508,50 @@ model Pharmacist {
 /// --------------------
 model Room {
   id          Int      @id @default(autoincrement())
+  publicId    String @unique @default(uuid())
   departmentId Int?
   name        String
   floor       String?
-  type        String?   // ICU, General, Private
+  type        String?
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
 
-  department  Department? @relation(fields: [departmentId], references: [id])
+  department  Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   beds        Bed[]
-  
-  admissions  Admission[]
 }
 
 model Bed {
   id         Int     @id @default(autoincrement())
   roomId     Int
-  bedNumber  String 
+  bedNumber  String
   isOccupied Boolean @default(false)
   createdAt  DateTime @default(now())
 
-  room       Room    @relation(fields: [roomId], references: [id])
-
+  room       Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
   admissions Admission[]
 }
 
-/// Admission separate from Appointment for IP workflows
 model Admission {
-  id               Int      @id @default(autoincrement())
+  id               String         @id @default(uuid())
+  publicId         String         @unique @default(uuid())
   patientId        Int
-  admittedAt       DateTime @default(now())
-  dischargedAt     DateTime?
-  admissionType    String?  // EMERGENCY / ELECTIVE
-  roomId           Int?
+  doctorId         Int?
   bedId            Int?
-  admittingDoctorId Int?
-  notes            String?
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  admissionDate    DateTime       @default(now())
+  admissionReason  String?
+  status           AdmissionStatus @default(ADMITTED)
+  dischargedAt     DateTime?
+  isActive         Boolean        @default(true)
+  deletedAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  patient          Patient  @relation(fields: [patientId], references: [id])
-  room             Room? @relation(fields: [roomId], references: [id])
-  bed              Bed? @relation(fields: [bedId], references: [id])
-  admittingDoctor  Doctor?  @relation(fields: [admittingDoctorId], references: [id])
+  patient          Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor           Doctor? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  bed              Bed? @relation(fields: [bedId], references: [id], onDelete: SetNull)
   invoices         Invoice[]
-  vitals           Vitals[]
+
+  @@index([publicId])
 }
 
 /// --------------------
@@ -378,7 +559,8 @@ model Admission {
 /// --------------------
 model Appointment {
   id                Int               @id @default(autoincrement())
-  appointmentNumber String? @unique
+  publicId          String            @unique @default(uuid())
+  appointmentNumber String?           @unique
   patientId         Int
   doctorId          Int?
   departmentId      Int?
@@ -393,23 +575,24 @@ model Appointment {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   isDeleted         Boolean           @default(false)
-
-  patient           Patient           @relation(fields: [patientId], references: [id])
-  doctor            Doctor?           @relation(fields: [doctorId], references: [id])
-  department        Department? @relation(fields: [departmentId], references: [id])
-  referralCode      ReferralCode? @relation(fields: [referralCodeId], references: [id])
+  isActive          Boolean           @default(true)
+  deletedAt         DateTime?
   
-  invoices          Invoice[]         // invoices (consultation, adjustments)
-  prescriptions     Prescription[]
+  patient           Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor            Doctor? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  department        Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  referralCode      ReferralCode? @relation(fields: [referralCodeId], references: [id], onDelete: SetNull)
+  invoices          Invoice[]
+  prescriptions     Prescription[] @relation("AppointmentPrescriptions")
   labRequests       LabRequest[]
   radiologyRequests RadiologyRequest[]
-  
   followUps         FollowUp[]
-
+  
   @@index([patientId, scheduledAt])
+  @@index([doctorId, status])
+  @@index([publicId])
 }
 
-/// free-form medical records
 model MedicalRecord {
   id          Int      @id @default(autoincrement())
   patientId   Int
@@ -418,126 +601,144 @@ model MedicalRecord {
   attachments Json?
   createdAt   DateTime @default(now())
   createdById Int?
-  patient     Patient  @relation(fields: [patientId], references: [id])
-  createdBy   User? @relation(fields: [createdById], references: [id])
+  
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdBy   User? @relation("MedicalRecordCreator", fields: [createdById], references: [id], onDelete: SetNull)
+}
+
+/// Follow-up model
+model FollowUp {
+  id            String          @id @default(uuid())
+  patientId     Int
+  appointmentId Int?
+  doctorId      Int?
+  followUpDate  DateTime
+  purpose       FollowUpPurpose
+  notes         String?
+  feedback      String?
+  status        FollowUpStatus  @default(SCHEDULED)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  patient       Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  doctor        Doctor? @relation("DoctorFollowUps", fields: [doctorId], references: [id], onDelete: SetNull)
+  @@index([patientId, followUpDate])
+  @@index([doctorId, status])
 }
 
 /// --------------------
 /// Referral & Commission Config / Transactions
 /// --------------------
-
-/// A doctor can have 0..n referral codes.
 model ReferralCode {
   id           Int      @id @default(autoincrement())
+  publicId     String   @unique @default(uuid())
   doctorId     Int
   code         String   @unique
   description  String?
-  isAuto       Boolean  @default(true) // auto-generated vs manual
+  isAuto       Boolean  @default(true)
   isActive     Boolean  @default(true)
+  deletedAt    DateTime?
   validFrom    DateTime?
   validTo      DateTime?
   createdAt    DateTime @default(now())
 
-  doctor       Doctor   @relation(fields: [doctorId], references: [id])
-  
-  commissionSetups CommissionSetup[] 
-  commissionTransactions CommissionTransaction[] 
-  appointments Appointment[] 
-  pharmacySales PharmacySale[] 
-  prescriptions Prescription[] 
-  labRequests LabRequest[] 
-  radiologyRequests RadiologyRequest[] 
-  surgeries Surgery[] 
-  bloodRequests BloodRequest[] 
+  doctor       Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  commissionSetups CommissionSetup[] // This is the field that caused the error, now correctly related
+  commissionTransactions CommissionTransaction[]
+  appointments Appointment[]
+  pharmacySales PharmacySale[]
+  prescriptions Prescription[]
+  labRequests LabRequest[]
+  radiologyRequests RadiologyRequest[]
+  procedures Procedure[]
+  bloodRequests BloodRequest[]
 
   @@index([doctorId])
+  @@index([code])
 }
 
-/// Commission configuration entries (admin sets what commission to apply)
 model CommissionSetup {
-  id           Int       @id @default(autoincrement())
+  id           Int           @id @default(autoincrement())
   createdById  Int?
-  doctorId     Int?          // optional doctor-specific override
+  doctorId     Int?
   departmentId Int?
   referralCodeId Int?
   source       SourceType
   commissionType CommissionType @default(PERCENTAGE)
-  value        Decimal       // percentage (e.g., 10.5) OR flat amount as per type
+  value        Decimal       @db.Decimal(14,2) @default("0.00")
   description  String?
   isActive     Boolean       @default(true)
   validFrom    DateTime?
   validTo      DateTime?
   createdAt    DateTime      @default(now())
 
-  createdBy    User? @relation(fields: [createdById], references: [id])
-  doctor       Doctor? @relation(fields: [doctorId], references: [id])
-  department   Department?   @relation(fields: [departmentId], references: [id])
-  referralCode ReferralCode? @relation(fields: [referralCodeId], references: [id])
-  
+  createdBy    User? @relation("CommissionSetupCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  doctor       Doctor? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  referralCode ReferralCode? @relation(fields: [referralCodeId], references: [id], onDelete: SetNull)
   @@index([source, doctorId, departmentId])
+  @@index([source, doctorId, departmentId, referralCodeId]) // Added combined index
 }
 
-/// CommissionTransaction logs when a specific billed event produces a commission for a doctor.
 model CommissionTransaction {
   id               Int             @id @default(autoincrement())
   referralCodeId   Int?
-  doctorId         Int             // beneficiary doctor
+  doctorId         Int
+  departmentId     Int?
   sourceType       SourceType
   sourceId         Int?
   invoiceId        Int?
-  amount           Decimal         @default(0.0) // computed amount credited to doctor
-  percentage       Decimal?
+  amount           Decimal         @db.Decimal(14,2) @default("0.00")
+  percentage       Decimal? @db.Decimal(14,2)
   commissionType   CommissionType
   status           CommissionStatus @default(PENDING)
   notes            String?
   createdAt        DateTime        @default(now())
   paidAt           DateTime?
-  referralCode     ReferralCode?   @relation(fields: [referralCodeId], references: [id])
-  doctor           Doctor          @relation(fields: [doctorId], references: [id])
-  invoice          Invoice? @relation(fields: [invoiceId], references: [id])
   
+  referralCode     ReferralCode? @relation(fields: [referralCodeId], references: [id], onDelete: SetNull)
+  doctor           Doctor          @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  department       Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  invoice          Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   payoutItem       CommissionPayoutItem?
-  
-  @@index([doctorId, status, sourceType])
+  @@index([doctorId, status, sourceType, departmentId])
 }
 
-/// When admin runs payouts, they can be grouped into Payout records (settlement)
 model CommissionPayout {
   id           Int       @id @default(autoincrement())
   payoutNumber String? @unique
-  totalAmount  Decimal   @default(0.0)
+  totalAmount  Decimal   @db.Decimal(14,2) @default("0.00")
   issuedAt     DateTime?
   createdAt    DateTime  @default(now())
   createdById  Int?
   notes        String?
-  createdBy    User?     @relation(fields: [createdById], references: [id])
+  
+  createdBy    User? @relation("CommissionPayoutCreator", fields: [createdById], references: [id], onDelete: SetNull)
   items        CommissionPayoutItem[]
 }
 
 model CommissionPayoutItem {
   id                    Int                 @id @default(autoincrement())
   commissionPayoutId    Int
-  commissionTransactionId Int               @unique 
-  amount                Decimal             @default(0.0)
+  commissionTransactionId Int @unique
+  amount                Decimal @db.Decimal(14,2) @default("0.00")
 
-  commissionPayout      CommissionPayout    @relation(fields: [commissionPayoutId], references: [id])
-  commissionTransaction CommissionTransaction @relation(fields: [commissionTransactionId], references: [id])
+  commissionPayout      CommissionPayout    @relation(fields: [commissionPayoutId], references: [id], onDelete: Cascade)
+  commissionTransaction CommissionTransaction @relation(fields: [commissionTransactionId], references: [id], onDelete: Cascade)
 }
 
-/// --------------------
-/// Earnings / Reporting
-/// --------------------
 model DoctorEarning {
   id           Int       @id @default(autoincrement())
   doctorId     Int
-  amount       Decimal   @default(0.0)
+  amount       Decimal   @db.Decimal(14,2) @default("0.00")
   sourceType   SourceType
   sourceId     Int?
-  referralCode String?   // snapshot of referral code used (string for audit)
+  referralCode String?
   note         String?
   createdAt    DateTime  @default(now())
 
-  doctor       Doctor    @relation(fields: [doctorId], references: [id])
+  doctor       Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   @@index([doctorId, sourceType, createdAt])
 }
 
@@ -546,11 +747,12 @@ model DoctorEarning {
 /// --------------------
 model Medicine {
   id            Int       @id @default(autoincrement())
+  publicId      String    @unique @default(uuid())
   name          String
   sku           String? @unique
   brand         String?
   description   String?
-  unitPrice     Decimal   @default(0.0)
+  unitPrice     Decimal   @db.Decimal(14,2) @default("0.00")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -567,10 +769,10 @@ model PharmacyStock {
   batchNumber String?
   expiryDate  DateTime?
   quantity    Int
-  costPrice   Decimal  @default(0.0)
+  costPrice   Decimal  @db.Decimal(14,2) @default("0.00")
   createdAt   DateTime @default(now())
 
-  medicine    Medicine @relation(fields: [medicineId], references: [id])
+  medicine    Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
 }
 
 model PurchaseOrder {
@@ -586,308 +788,387 @@ model PurchaseOrderItem {
   purchaseOrderId Int
   medicineId      Int
   quantity        Int
-  unitPrice       Decimal  @default(0.0)
+  unitPrice       Decimal  @db.Decimal(14,2) @default("0.00")
 
-  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
-  medicine Medicine @relation(fields: [medicineId], references: [id])
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
 }
 
 model PharmacySale {
-  id                 Int      @id @default(autoincrement())
-  saleNumber         String? @unique
-  prescriptionId     Int?     @unique 
-  pharmacistId       Int?
-  totalAmount        Decimal  @default(0.0)
-  paymentMode        PaymentMode
-  paymentStatus      PaymentStatus @default(PENDING)
-  referralCodeId     Int?
-  createdAt          DateTime @default(now())
+  id              Int       @id @default(autoincrement())
+  publicId        String    @unique @default(uuid())
+  saleNumber      String? @unique
+  prescriptionId  Int? @unique
+  pharmacistId    Int?
+  totalAmount     Decimal   @db.Decimal(14,2) @default("0.00")
+  paymentMode     PaymentMode
+  paymentStatus   PaymentStatus @default(PENDING)
+  referralCodeId  Int?
+  isActive        Boolean   @default(true)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
 
-  prescription       Prescription? @relation(fields: [prescriptionId], references: [id])
-  pharmacist         Pharmacist? @relation(fields: [pharmacistId], references: [id])
-  referralCode       ReferralCode? @relation(fields: [referralCodeId], references: [id])
+  prescription    Prescription? @relation(fields: [prescriptionId], references: [id]) 
+  pharmacist      Pharmacist? @relation("PharmacistSales", fields: [pharmacistId], references: [id], onDelete: SetNull)
+  referralCode    ReferralCode? @relation(fields: [referralCodeId], references: [id], onDelete: SetNull)
+  processedBy     User? @relation("user_pharmacy_sales", fields: [pharmacistId], references: [id], onDelete: SetNull, map: "PharmacySale_ProcessedBy_fkey")
+  items           PharmacySaleItem[]
+  invoices        Invoice[]
   
-  items              PharmacySaleItem[]
-  invoices           Invoice[] 
-
   @@index([referralCodeId, paymentStatus])
+  @@index([publicId])
 }
 
 model PharmacySaleItem {
-  id                 Int      @id @default(autoincrement())
-  pharmacySaleId     Int
-  medicineId         Int
-  quantity           Int
-  unitPrice          Decimal  @default(0.0)
-  totalPrice         Decimal  @default(0.0)
+  id              Int     @id @default(autoincrement())
+  pharmacySaleId  Int
+  medicineId      Int
+  quantity        Int
+  unitPrice       Decimal @db.Decimal(14,2) @default("0.00")
+  totalPrice      Decimal @db.Decimal(14,2) @default("0.00")
 
-  pharmacySale       PharmacySale @relation(fields: [pharmacySaleId], references: [id])
-  medicine           Medicine @relation(fields: [medicineId], references: [id])
+  pharmacySale    PharmacySale @relation(fields: [pharmacySaleId], references: [id], onDelete: Cascade)
+  medicine        Medicine     @relation(fields: [medicineId], references: [id], onDelete: Cascade)
 }
 
-/// Prescriptions and items
+// FIX: Missing model definition for prescription items
+model PrescriptionItem {
+  id Int @id @default(autoincrement())
+  prescriptionId Int
+  medicineId Int
+  dosage String? // e.g., '10mg'
+  quantity Int // Total quantity to dispense for the course
+  durationDays Int? // Duration for the course (e.g., 7 days)
+  instructions String? // e.g., 'Twice a day after meal'
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+
+  @@index([prescriptionId])
+  @@index([medicineId])
+}
+
+
 model Prescription {
   id                 Int      @id @default(autoincrement())
+  publicId           String   @unique @default(uuid())
   prescriptionNumber String? @unique
   patientId          Int
   doctorId           Int?
-  appointmentId      Int? // Foreign key added
   issuedAt           DateTime @default(now())
   notes              String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   referralCodeId     Int?
-  patient            Patient @relation(fields: [patientId], references: [id])
-  doctor             Doctor? @relation(fields: [doctorId], references: [id])
-  appointment        Appointment? @relation(fields: [appointmentId], references: [id])
-  referralCode       ReferralCode? @relation(fields: [referralCodeId], references: [id])
+  isActive           Boolean  @default(true)
+  deletedAt          DateTime?
   
-  items              PrescriptionItem[]
-  pharmacySale       PharmacySale? @relation 
-}
-
-model PrescriptionItem {
-  id                 Int      @id @default(autoincrement())
-  prescriptionId     Int
-  medicineId         Int
-  dosage             String?
-  quantity           Int
-  unitPrice          Decimal  @default(0.0)
-  totalPrice         Decimal  @default(0.0)
-
-  prescription       Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
-  medicine           Medicine @relation(fields: [medicineId], references: [id])
+  patient            Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor             Doctor? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  referralCode       ReferralCode? @relation(fields: [referralCodeId], references: [id], onDelete: SetNull)
+  items              PrescriptionItem[] // FIXED: Now links to the defined model
+  pharmacySale       PharmacySale?
+  appointments Appointment[] @relation("AppointmentPrescriptions")
+  
+  @@index([publicId])
 }
 
 /// --------------------
 /// Lab & Radiology
 /// --------------------
 model LabTestTemplate {
-  id              Int       @id @default(autoincrement())
-  code            String    @unique
-  name            String
-  departmentId    Int?
-  price           Decimal   @default(0.0)
-  createdAt       DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  name         String
+  departmentId Int?
+  price        Decimal  @db.Decimal(14,2) @default("0.00")
+  createdAt    DateTime @default(now())
 
-  department      Department? @relation(fields: [departmentId], references: [id])
-  requests        LabRequest[]
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  requests     LabRequest[]
 }
 
 model LabRequest {
-  id              Int      @id @default(autoincrement())
-  requestNumber   String? @unique
-  patientId       Int
-  doctorId        Int?
-  appointmentId   Int?
-  templateId      Int
-  referralCodeId  Int?
-  status          TestStatus @default(REQUESTED)
-  requestedAt     DateTime @default(now())
-  completedAt     DateTime?
-  resultFileUrl   String?
-  resultSummary   String?
-  price           Decimal @default(0.0)
-  paymentStatus   PaymentStatus @default(PENDING)
-  createdAt       DateTime @default(now())
+  id            Int        @id @default(autoincrement())
+  requestNumber String? @unique
+  patientId     Int
+  doctorId      Int?
+  appointmentId Int?
+  templateId    Int?
+  referralCodeId Int?
+  status        TestStatus @default(REQUESTED)
+  requestedAt   DateTime   @default(now())
+  completedAt   DateTime?
+  resultFileUrl String?
+  resultSummary String?
+  price         Decimal    @db.Decimal(14,2) @default("0.00")
+  paymentStatus PaymentStatus @default(PENDING)
+  isActive      Boolean    @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime   @default(now())
 
-  patient         Patient @relation(fields: [patientId], references: [id])
-  doctor          Doctor? @relation(fields: [doctorId], references: [id])
-  appointment     Appointment? @relation(fields: [appointmentId], references: [id])
-  template        LabTestTemplate @relation(fields: [templateId], references: [id])
-  referralCode    ReferralCode? @relation(fields: [referralCodeId], references: [id])
+  patient       Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor        Doctor? @relation("DoctorLabRequests", fields: [doctorId], references: [id], onDelete: SetNull)
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  template      LabTestTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  referralCode  ReferralCode? @relation(fields: [referralCodeId], references: [id], onDelete: SetNull)
+  invoices      Invoice[]
   
-  invoices        Invoice[]
-  
+  result        LabResult?
   @@index([referralCodeId, status])
+}
+
+// LabResult model
+model LabResult {
+  id             Int          @id @default(autoincrement())
+  publicId       String       @unique @default(uuid())
+  labRequestId   Int          @unique
+  resultantId    Int?
+  testName       String?
+  resultSummary  String?      @db.Text
+  resultFileUrl  String?
+  status         ResultStatus @default(NOT_REPORTED)
+  resultedAt     DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  labRequest     LabRequest   @relation(fields: [labRequestId], references: [id], onDelete: Cascade)
+  resultant      User? @relation("user_lab_results", fields: [resultantId], references: [id], onDelete: SetNull)
+
+  @@map("lab_results")
+  @@index([resultantId])
 }
 
 model RadiologyTemplate {
-  id              Int       @id @default(autoincrement())
-  code            String    @unique
-  name            String
-  departmentId    Int?
-  price           Decimal @default(0.0)
-  createdAt       DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  name         String
+  departmentId Int?
+  price        Decimal  @db.Decimal(14,2) @default("0.00")
+  createdAt    DateTime @default(now())
 
-  department      Department? @relation(fields: [departmentId], references: [id])
-  requests        RadiologyRequest[]
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  requests     RadiologyRequest[]
 }
 
 model RadiologyRequest {
-  id              Int      @id @default(autoincrement())
-  requestNumber   String? @unique
-  patientId       Int
-  doctorId        Int?
-  appointmentId   Int?
-  templateId      Int
-  referralCodeId  Int?
-  status          TestStatus @default(REQUESTED)
-  requestedAt     DateTime @default(now())
-  completedAt     DateTime?
-  reportUrl       String?
-  findings        String?
-  price           Decimal @default(0.0)
-  paymentStatus   PaymentStatus @default(PENDING)
+  id            Int        @id @default(autoincrement())
+  requestNumber String? @unique
+  patientId     Int
+  doctorId      Int?
+  appointmentId Int?
+  templateId    Int?
+  referralCodeId Int?
+  status        TestStatus @default(REQUESTED)
+  requestedAt   DateTime   @default(now())
+  completedAt   DateTime?
+  reportUrl     String?
+  findings      String?
+  price         Decimal    @db.Decimal(14,2) @default("0.00")
+  paymentStatus PaymentStatus @default(PENDING)
+  isActive      Boolean    @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime   @default(now())
 
-  patient         Patient @relation(fields: [patientId], references: [id])
-  doctor          Doctor? @relation(fields: [doctorId], references: [id])
-  appointment     Appointment? @relation(fields: [appointmentId], references: [id])
-  template        RadiologyTemplate @relation(fields: [templateId], references: [id])
-  referralCode    ReferralCode? @relation(fields: [referralCodeId], references: [id])
-  
-  invoices        Invoice[]
-  
+  patient       Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor        Doctor? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  template      RadiologyTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  referralCode  ReferralCode? @relation(fields: [referralCodeId], references: [id], onDelete: SetNull)
+  invoices      Invoice[]
   @@index([referralCodeId, status])
 }
 
 /// --------------------
-/// Surgery Module
+/// Procedure (replaces Surgery module)
 /// --------------------
-model Surgery {
-  id              Int      @id @default(autoincrement())
-  surgeryNumber   String? @unique
+model Procedure {
+  id              Int       @id @default(autoincrement())
+  publicId        String    @unique @default(uuid())
+  procedureNumber String? @unique
   patientId       Int
-  scheduledAt     DateTime
-  status          SurgeryStatus @default(SCHEDULED)
-  surgeryType     String?
-  operatingRoom   String?
+  performedById   Int?
+  procedureType   String?
+  scheduledAt     DateTime?
+  status          String?
   referralCodeId  Int?
   notes           String?
-  createdAt       DateTime @default(now())
+  operatingRoom   String?
+  isActive        Boolean   @default(true)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  patient         Patient @relation(fields: [patientId], references: [id])
-  referralCode    ReferralCode? @relation(fields: [referralCodeId], references: [id])
-  
-  team            SurgeryDoctor[]
+  patient         Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  performedBy     Doctor? @relation(fields: [performedById], references: [id], onDelete: SetNull)
+  referralCode    ReferralCode? @relation(fields: [referralCodeId], references: [id], onDelete: SetNull)
   invoices        Invoice[]
-  
+  team            ProcedureTeam[]
   @@index([referralCodeId, scheduledAt])
+  @@index([publicId])
 }
 
-model SurgeryDoctor {
-  id              Int      @id @default(autoincrement())
-  surgeryId       Int
-  doctorId        Int
-  role            String?
-  // Surgeon, Assistant, Anesthetist
+/// ProcedureTeam: members involved (mapped to Doctor)
+model ProcedureTeam {
+  id           Int      @id @default(autoincrement())
+  procedureId  Int
+  memberId     Int      // Doctor.id
+  memberRole   String?
+  createdAt    DateTime @default(now())
 
-  surgery         Surgery @relation(fields: [surgeryId], references: [id])
-  doctor          Doctor @relation(fields: [doctorId], references: [id])
+  procedure    Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+  doctor       Doctor    @relation(fields: [memberId], references: [id], onDelete: Cascade)
 }
 
 /// --------------------
-/// Billing: Invoice / Payment
+/// Billing: Invoice / Payment (updated: procedure references)
 /// --------------------
 model Invoice {
-  id              Int      @id @default(autoincrement())
-  invoiceNumber   String @unique
-  invoiceType     InvoiceType
-  appointmentId   Int?
-  admissionId     Int?
-  pharmacySaleId  Int?
-  labRequestId    Int?
+  id                 Int        @id @default(autoincrement())
+  publicId           String     @unique @default(uuid())
+  invoiceNumber      String     @unique
+  invoiceType        InvoiceType
+  appointmentId      Int?
+  admissionId        String?
+  pharmacySaleId     Int?
+  labRequestId       Int?
   radiologyRequestId Int?
-  surgeryId       Int?
-  patientId       Int
-  totalAmount     Decimal @default(0.0)
-  paidAmount      Decimal @default(0.0)
-  paymentMode     PaymentMode?
-  paymentStatus   PaymentStatus @default(PENDING)
-  issuedAt        DateTime @default(now())
-  dueAt           DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  procedureId        Int?
+  patientId          Int
+  totalAmount        Decimal    @db.Decimal(14,2) @default("0.00")
+  paidAmount         Decimal    @db.Decimal(14,2) @default("0.00")
+  paymentMode        PaymentMode?
+  paymentStatus      PaymentStatus @default(PENDING)
+  issuedAt           DateTime   @default(now())
+  dueAt              DateTime?
+  isActive           Boolean    @default(true)
+  deletedAt          DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
-  patient         Patient @relation(fields: [patientId], references: [id])
-  appointment     Appointment? @relation(fields: [appointmentId], references: [id])
-  admission       Admission? @relation(fields: [admissionId], references: [id])
-  pharmacySale    PharmacySale? @relation(fields: [pharmacySaleId], references: [id])
-  labRequest      LabRequest? @relation(fields: [labRequestId], references: [id])
-  radiologyRequest RadiologyRequest? @relation(fields: [radiologyRequestId], references: [id])
-  surgery         Surgery? @relation(fields: [surgeryId], references: [id])
+  patient            Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointment        Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  admission          Admission? @relation(fields: [admissionId], references: [id], onDelete: SetNull)
+  pharmacySale       PharmacySale? @relation(fields: [pharmacySaleId], references: [id], onDelete: SetNull)
+  labRequest         LabRequest? @relation(fields: [labRequestId], references: [id], onDelete: SetNull)
+  radiologyRequest   RadiologyRequest? @relation(fields: [radiologyRequestId], references: [id], onDelete: SetNull)
+  procedure          Procedure? @relation(fields: [procedureId], references: [id], onDelete: SetNull)
 
-  payments        Payment[]
-  invoiceItems    InvoiceItem[]
-  
+  payments           Payment[]
+  invoiceItems       InvoiceItem[]
   commissionTransactions CommissionTransaction[]
+  insuranceClaims    InsuranceClaim[]
+  refunds            Refund[]
 
-  @@index([patientId, issuedAt])
+  @@index([patientId, paymentStatus])
+  @@index([publicId])
 }
 
 model InvoiceItem {
-  id              Int      @id @default(autoincrement())
-  invoiceId       Int
-  description     String
-  quantity        Int @default(1)
-  unitPrice       Decimal @default(0.0)
-  total           Decimal @default(0.0)
+  id         Int     @id @default(autoincrement())
+  invoiceId  Int
+  description String
+  quantity   Int     @default(1)
+  unitPrice  Decimal @db.Decimal(14,2) @default("0.00")
+  total      Decimal @db.Decimal(14,2) @default("0.00")
 
-  invoice         Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice    Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
 
 model Payment {
-  id              Int      @id @default(autoincrement())
-  invoiceId       Int
-  amount          Decimal @default(0.0)
-  paymentMode     PaymentMode
-  paymentRef      String?
-  paidAt          DateTime @default(now())
-  status          PaymentStatus @default(PAID)
-  createdAt       DateTime @default(now())
+  id          Int       @id @default(autoincrement())
+  invoiceId   Int
+  amount      Decimal   @db.Decimal(14,2) @default("0.00")
+  paymentMode PaymentMode
+  paymentRef  String?
+  paidAt      DateTime  @default(now())
+  status      PaymentStatus @default(PAID)
+  createdAt   DateTime  @default(now())
 
-  invoice         Invoice @relation(fields: [invoiceId], references: [id])
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  refunds     Refund[]
+  @@index([invoiceId, status])
+}
+
+/// --------------------
+/// Insurance Claims Module
+/// --------------------
+model InsuranceClaim {
+  id               String              @id @default(uuid())
+  claimNumber      String @unique
+  invoiceId        Int
+  patientId        Int
+  insuranceProvider String
+  policyNumber     String
+  claimAmount      Decimal             @db.Decimal(14,2) @default("0.00")
+  approvedAmount   Decimal             @db.Decimal(14,2) @default("0.00")
+  submissionDate   DateTime
+  approvalDate     DateTime?
+  status           InsuranceClaimStatus @default(SUBMITTED)
+  remarks          String?
+  documents        Json?
+  processedBy      Int?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  invoice          Invoice             @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  patient          Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  processedByUser  User? @relation("ClaimProcessedBy", fields: [processedBy], references: [id], onDelete: SetNull)
+  @@index([patientId, status])
+  @@map("insurance_claims")
 }
 
 /// --------------------
 /// Accounts / Finance helpers
 /// --------------------
 model Expense {
-  id              Int      @id @default(autoincrement())
-  title           String
-  amount          Decimal @default(0.0)
-  expenseDate     DateTime
-  departmentId    Int?
-  notes           String?
-  createdAt       DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  title       String
+  amount      Decimal  @db.Decimal(14,2) @default("0.00")
+  expenseDate DateTime
+  departmentId Int?
+  notes       String?
+  createdAt   DateTime @default(now())
 
-  department      Department? @relation(fields: [departmentId], references: [id])
+  department  Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 }
 
 model DepartmentRevenue {
-  id              Int      @id @default(autoincrement())
-  departmentId    Int
-  date            DateTime
-  totalAmount     Decimal @default(0.0)
+  id           Int      @id @default(autoincrement())
+  departmentId Int
+  date         DateTime
+  totalAmount  Decimal  @db.Decimal(14,2) @default("0.00")
 
-  department      Department @relation(fields: [departmentId], references: [id])
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  @@index([departmentId, date])
 }
 
 /// --------------------
-/// Medication Administration
+/// Nursing / Medication Logs
 /// --------------------
 model MedicationLog {
   id             Int      @id @default(autoincrement())
-  patientId      Int
   nurseId        Int
+  patientId      Int
   medicineId     Int?
-  administeredAt DateTime @default(now())
   dosage         String?
+  administeredAt DateTime @default(now())
   notes          String?
-  patient        Patient @relation(fields: [patientId], references: [id])
-  nurse          Nurse @relation(fields: [nurseId], references: [id])
-  medicine       Medicine? @relation(fields: [medicineId], references: [id])
+  
+  nurse          Nurse    @relation(fields: [nurseId], references: [id], onDelete: Cascade)
+  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  medicine       Medicine? @relation(fields: [medicineId], references: [id], onDelete: SetNull)
 }
 
 model NurseNote {
-  id             Int       @id @default(autoincrement())
-  patientId      Int
-  nurseId        Int
-  note           String @db.Text
-  createdAt      DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  nurseId   Int
+  patientId Int
+  note      String @db.Text
+  createdAt DateTime @default(now())
 
-  patient        Patient @relation(fields: [patientId], references: [id])
-  nurse          Nurse @relation(fields: [nurseId], references: [id])
+  nurse     Nurse    @relation(fields: [nurseId], references: [id], onDelete: Cascade)
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 /// --------------------
@@ -897,7 +1178,6 @@ model Attachment {
   id        Int      @id @default(autoincrement())
   url       String
   type      String?
-  // e.g., report/pdf, image/png
   meta      Json?
   createdAt DateTime @default(now())
 }
@@ -911,10 +1191,8 @@ model Setting {
 }
 
 /// --------------------
-/// Blood Bank
+/// Blood Bank Module
 /// --------------------
-
-// Donor registry for blood bank
 model BloodDonor {
   id          Int      @id @default(autoincrement())
   donorCode   String? @unique
@@ -928,149 +1206,166 @@ model BloodDonor {
   inventories BloodInventory[]
 }
 
-// Inventory tracks units per batch/donation
 model BloodInventory {
   id           Int       @id @default(autoincrement())
+  publicId     String    @unique @default(uuid())
   donorId      Int?
   bloodType    BloodType
-  units        Int       @default(1) // number of units in this record
+  units        Int       @default(1)
   collectedAt  DateTime  @default(now())
   expiryAt     DateTime?
-  status       String?   // AVAILABLE | ISSUED | QUARANTINE
+  status       String?
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
   createdAt    DateTime  @default(now())
 
-  donor        BloodDonor? @relation(fields: [donorId], references: [id])
+  donor        BloodDonor? @relation(fields: [donorId], references: [id], onDelete: SetNull)
   requests     BloodRequest[]
   @@index([bloodType, status])
+  @@index([publicId])
 }
 
-// When blood is requested/issued to a patient
 model BloodRequest {
   id              Int       @id @default(autoincrement())
+  publicId        String    @unique @default(uuid())
   requestNumber   String? @unique
-  inventoryId     Int?      // which inventory batch used
+  inventoryId     Int?
   patientId       Int?
-  requestedById   Int?      // user who requested (could be doctor/nurse)
+  requestedById   Int?
   doctorId        Int?
-  referralCodeId  Int?      // referral code applied for commission
+  referralCodeId  Int?
   unitsRequested  Int       @default(1)
   unitsIssued     Int?
   issueDate       DateTime?
-  status          String    @default("REQUESTED") // REQUESTED | ISSUED | CANCELLED
-  commissionAmount Decimal  @default(0.0) // commission if any
+  status          String    @default("REQUESTED")
+  commissionAmount Decimal  @db.Decimal(14,2) @default("0.00")
   notes           String?
+  isActive        Boolean   @default(true)
+  deletedAt       DateTime?
   createdAt       DateTime  @default(now())
 
-  inventory       BloodInventory? @relation(fields: [inventoryId], references: [id])
-  patient         Patient? @relation(fields: [patientId], references: [id])
-  requestedBy     User? @relation(fields: [requestedById], references: [id])
-  doctor          Doctor? @relation(fields: [doctorId], references: [id])
-  referralCode    ReferralCode? @relation(fields: [referralCodeId], references: [id])
+  inventory       BloodInventory? @relation(fields: [inventoryId], references: [id], onDelete: SetNull)
+  patient         Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  requestedBy     User? @relation("BloodRequestRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  doctor          Doctor? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  referralCode    ReferralCode? @relation(fields: [referralCodeId], references: [id], onDelete: SetNull)
   @@index([doctorId, referralCodeId, status])
+  @@index([publicId])
 }
 
-model Vitals {
-  id             Int         @id @default(autoincrement())
-  patientId      Int
-  admissionId    Int?        // optional if recorded outside admission
-  recordedById   Int?        // staff user who entered the vitals
-  recordedAt     DateTime    @default(now())
+/// --------------------
+/// Patient Vitals Module
+/// --------------------
+model Vital {
+  id                    Int      @id @default(autoincrement())
+  patientId             Int
+  recordedById          Int?
+  temperature           Float?
+  pulse                 Float?
+  bloodPressureSystolic Float?
+  bloodPressureDiastolic Float?
+  respiratoryRate       Float?
+  spo2                  Float?
+  weight                Float?
+  height                Float?
+  bmi                   Float?
+  remarks               String?
+  recordedAt            DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  // Core measurements
-  temperature    Decimal?    @db.Decimal(5,2)  // Celsius
-  pulse          Int?        // Beats per minute
-  respiration    Int?        // Breaths per minute
-  systolic       Int?        // mmHg
-  diastolic      Int?        // mmHg
-  spo2           Int?        // Oxygen saturation %
-  weight         Decimal?    @db.Decimal(6,2)  // kg
-  height         Decimal?    @db.Decimal(5,2)  // cm
-  bmi            Decimal?    @db.Decimal(5,2)
-  painScore      Int?        // 0–10
-  remarks        String? @db.Text
-
-  // Meta
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-
-  // Relations
-  patient        Patient     @relation(fields: [patientId], references: [id])
-  admission      Admission? @relation(fields: [admissionId], references: [id])
-  recordedBy     User? @relation("UserRecordedVitals", fields: [recordedById], references: [id])
-
+  patient               Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  recordedBy            Doctor? @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  @@index([patientId, recordedAt])
   @@map("vitals")
-  @@index([patientId])
-  @@index([admissionId])
-  @@index([recordedAt])
 }
 
-model FollowUp {
+/// --------------------
+/// Refunds Module
+/// --------------------
+model Refund {
   id             String       @id @default(uuid())
+  invoiceId      Int
+  paymentId      Int
   patientId      Int
-  doctorId       Int
-  appointmentId  Int?
-  followUpDate   DateTime
-  purpose        FollowUpPurpose
-  notes          String?
-  feedback       String?
-  status         FollowUpStatus  @default(SCHEDULED)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  refundAmount   Decimal      @db.Decimal(14,2) @default("0.00")
+  refundMode     RefundMode
+  transactionRef String?
+  refundReason   RefundReason
+  processedBy    Int?
+  refundDate     DateTime
+  status         RefundStatus @default(PENDING)
+  remarks        String?
+  attachment     String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  // ====== Relations ======
-  patient        Patient    @relation(fields: [patientId], references: [id])
-  doctor         User       @relation("FollowUpDoctor", fields: [doctorId], references: [id])
-  appointment    Appointment? @relation(fields: [appointmentId], references: [id])
-
-  @@index([patientId])
-  @@index([doctorId])
-  @@index([followUpDate])
-  @@index([status])
-  @@map("follow_ups")
+  invoice        Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  payment        Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  patient        Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  processedByUser User? @relation("RefundProcessedBy", fields: [processedBy], references: [id], onDelete: SetNull)
+  @@index([patientId, status, refundDate])
+  @@map("refunds")
 }
 
-enum FollowUpPurpose {
-  REVIEW
-  LAB_RESULT
-  PROCEDURE
-  FOLLOW_CHECKUP
+/// --------------------
+/// Duty Roster & Housekeeping
+/// --------------------
+model DutyRoster {
+  id            String   @id @default(uuid())
+  rosterName    String
+  departmentId  Int
+  startDate     DateTime
+  endDate       DateTime
+  shiftType     DutyShiftType @default(STRAIGHT)
+  isPublished   Boolean  @default(false)
+  createdById   Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  department    Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdBy     User? @relation("DutyRosterCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  assignments   DutyAssignment[]
+  @@index([departmentId, startDate, endDate])
 }
 
-enum FollowUpStatus {
-  SCHEDULED
-  COMPLETED
-  MISSED
-  CANCELLED
-}
-model StaffAttendance {
-  id            String              @id @default(uuid())
-  staffId       Int                 // FIX: Changed from BigInt to Int
-  date          DateTime
-  shiftType     ShiftType
-  status        AttendanceStatus    @default(PRESENT)
-  checkInTime   DateTime?
-  checkOutTime  DateTime?
-  remarks       String?
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+model DutyAssignment {
+  id          String      @id @default(uuid())
+  rosterId    String
+  staffId     Int
+  roleId      Int?
+  date        DateTime
+  dayOfWeek   DayOfWeek
+  status      DutyStatus  @default(SCHEDULED)
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  // ===== Relations =====
-  // FIX: Added custom relation name "StaffAttendanceUser"
-  staff         User                @relation("StaffAttendanceUser", fields: [staffId], references: [id]) 
-
-  @@index([staffId])
-  @@index([date])
-  @@map("staff_attendance")
+  roster      DutyRoster  @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  staff       User        @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  role        Role? @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  @@index([rosterId, date])
+  @@index([staffId, date])
 }
 
-enum ShiftType {
-  DAY
-  NIGHT
-}
+model HousekeepingTask {
+  id              String            @id @default(uuid())
+  assignedStaffId String
+  area            String
+  taskType        TaskType
+  priority        Priority          @default(MEDIUM)
+  scheduledDate   DateTime
+  completionDate  DateTime?
+  status          HousekeepingStatus @default(PENDING)
+  verificationBy  Int?
+  remarks         String?
+  photoEvidence   Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
-enum AttendanceStatus {
-  PRESENT
-  ABSENT
-  LATE
-  ON_LEAVE
+  assignedStaff   StaffAttendance   @relation(fields: [assignedStaffId], references: [id], onDelete: Cascade)
+  verifiedBy      User? @relation("HousekeepingVerifier", fields: [verificationBy], references: [id], onDelete: SetNull)
+  @@index([assignedStaffId, status])
+  @@index([verificationBy, status])
+  @@map("housekeeping_tasks")
 }
